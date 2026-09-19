@@ -6,6 +6,8 @@ It patches EveJS only in memory. No vendor source file is edited on disk, and th
 
 See [HOW-IT-WORKS.md](HOW-IT-WORKS.md) for the full mechanism - the client/server split, the exact seam, the in-memory transform, the fail-closed gate, and the invariants to preserve if you modify it.
 
+[CHANGELOG.md](CHANGELOG.md) lists what each release contains.
+
 ## At a glance
 
 The autopilot warp lands **on** its target instead of stopping roughly 10 km short, so a stargate jump

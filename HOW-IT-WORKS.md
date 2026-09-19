@@ -549,6 +549,8 @@ mods/autopilotJumpZero/
   evejs-launcher.mod.json   EveJS Launcher manifest (schemaVersion 3, kind loader)
   README.md                 install / configure / verify
   HOW-IT-WORKS.md           this document
+  CHANGELOG.md              what each release contains
+  LICENSE                   AGPL-3.0
   test/run.js               mechanical suite
   test/installer.js         installer round-trip tests
 

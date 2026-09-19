@@ -1,0 +1,5 @@
+# Sources and docs are LF; the Windows launchers need CRLF. Store both exactly
+# as they are on disk so a clone reproduces working files byte for byte.
+* text=auto eol=lf
+*.bat -text
+*.zip binary

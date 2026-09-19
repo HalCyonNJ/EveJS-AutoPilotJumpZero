@@ -6,6 +6,25 @@ It patches EveJS only in memory. No vendor source file is edited on disk, and th
 
 See [HOW-IT-WORKS.md](HOW-IT-WORKS.md) for the full mechanism - the client/server split, the exact seam, the in-memory transform, the fail-closed gate, and the invariants to preserve if you modify it.
 
+## At a glance
+
+The autopilot warp lands **on** its target instead of stopping roughly 10 km short, so a stargate jump
+fires the moment the warp ends and a station destination docks on arrival:
+
+- 🚀 gates: the warp lands inside the client's jump bubble, so the jump goes out as the warp ends,
+- 🛰️ stations and structures: the warp lands inside docking range, so the autopilot docks on arrival,
+- 🎛️ one number is the whole tuning surface - `EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS`, default `0`,
+- 🖱️ manual warps, fleet warps, scan-result warps and agent warps carry their own range and are untouched,
+- 🧱 a seam that is missing, duplicated or already owned by another patch makes the mod **fail closed**: it
+  logs why and the server keeps vanilla autopilot,
+- 🎁 no client change and no source file edited on disk - one file is transformed in memory at startup.
+
+`EVEJS_AUTOPILOT_JUMP_ZERO=0` disables it. A value outside `0`-`1000000` is rejected at load time and the
+mod goes inert rather than guessing. Settings live in `.env` beside `loader.js` - every variable is
+documented in `.env.example` - or as environment variables on the `server` service in Compose.
+
+Everything in this repository - `README.md`, `HOW-IT-WORKS.md` and `installer/README.md` - is written
+to be read by a person or fed to an AI, so the mod can be understood and changed.
 ## Why this works on the server
 
 The retail client autopilot (`eve/client/script/parklife/autopilot.py`) does two separate things:
@@ -36,16 +55,23 @@ With the default of `0`:
 - a stargate warp lands on the gate surface, inside the jump bubble the client checks, so `CmdStargateJump` goes out as the warp ends;
 - a station or structure warp lands inside docking range, so the autopilot docks on arrival.
 
-## Installation
+## Install
+
+Get this folder into `<EveJS root>\mods\autopilotJumpZero` - clone the repository, copy the
+folder, or take `Source code (zip)` from the release you want - and run the installer from inside it.
+The folder name matters: the preload points at `mods\autopilotJumpZero`, so a GitHub archive that
+unpacks as `EveJS-AutoPilotJumpZero-main` has to be renamed to that.
 
 ### Installer (native and Docker)
 
+Run the installer with no arguments and it assumes EveJS is installed on this computer and
+finds the root itself. Use `--server "C:\path\to\EveJS"` only to override that search.
+
 ```text
-install.bat --server "C:\path\to\EveJS"
+installer\install.bat
 ```
 
-`install.bat` ships in the installer package beside this folder. It copies this
-folder to `<EveJS root>\mods\autopilotJumpZero` and registers the preload in
+It copies this folder to `<EveJS root>\mods\autopilotJumpZero` and registers the preload in
 every deployment it finds:
 
 | Deployment | Registered in | Entry added |
@@ -58,8 +84,9 @@ copied to `<EveJS root>\_autopilotjumpzero-backup\<timestamp>\` first. The
 native block **appends** to `NODE_OPTIONS` instead of claiming it, so it composes
 with other loader mods; a block left behind by v1.1.1 is upgraded in place by
 re-running the installer.
+
 `--docker-only` and `--native-only` restrict it to one deployment, `--dry-run`
-reports without writing, and `status.bat` shows what is currently registered.
+reports without writing, and `installer\status.bat` shows what is currently registered.
 
 Afterwards rebuild a Docker deployment, or restart a native one:
 
@@ -70,15 +97,16 @@ Native : restart the server with StartServer.bat
 
 ### EveJS Launcher (native)
 
-1. Keep the ZIP as it is - no extraction is needed.
+No ZIP is published - build one from this folder:
+
+1. Zip this folder so `autopilotJumpZero\` is the archive root and
+   `evejs-launcher.mod.json` sits inside it, beside `loader.js`.
 2. Open **Mods** in EveJS Launcher and click **Add ZIP**.
 3. Import it and turn on the toggle beside **Autopilot Jump Zero**.
 4. Restart Game.
 
-Use the `-launcher.zip` artifact: its root is this folder. The installer package
-carries `install.bat` and the other deployment wiring at its root, which the
-launcher has no use for. The `evejs-launcher.mod.json` manifest describes the
-launcher integration only; Docker is handled by `docker/entrypoint.sh`.
+Keep the folder inside the ZIP named `autopilotJumpZero`. The manifest describes
+the launcher integration only; Docker is handled by `docker/entrypoint.sh`.
 
 ### Manual
 
@@ -155,7 +183,7 @@ On a live server you can confirm the effect from the server log: `CmdWarpToStuff
 ## Uninstall
 
 1. Stop the server.
-2. Run the installer package's `uninstall.bat --server "<EveJS root>"`, or turn
+2. Run `installer\uninstall.bat --server "<EveJS root>"`, or turn
    the mod off in the launcher, or remove the `--require .../autopilotJumpZero/loader.js`
    entries and the `mods/autopilotJumpZero` folder by hand.
 3. Rebuild first if Docker is used, then restart.

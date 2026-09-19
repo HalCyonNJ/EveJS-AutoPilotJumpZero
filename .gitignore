@@ -1,3 +1,6 @@
+# Local settings. .env.example is the documented template and is published.
+.env
+
 node_modules/
 *.log
 .DS_Store

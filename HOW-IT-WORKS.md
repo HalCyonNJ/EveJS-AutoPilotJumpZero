@@ -409,7 +409,7 @@ the range, and this mod makes the server pick zero.*
 
 The mod is a preload, so it has to be registered once per launch path. There are
 only three places that can actually start the EveJS server, and the installer
-(`install.bat` → `installer/install.js`) covers all of them idempotently.
+(`installer/install.bat` → `installer/install.js`) covers all of them idempotently.
 
 | Deployment | File | Entry added | Rebuild needed? |
 |---|---|---|---|
@@ -448,7 +448,7 @@ Three deliberate implementation details, all learned the hard way:
   still sees the exports this transform produced. Appending is what makes that
   position safe.
 
-Uninstall is the mirror image: `uninstall.bat` removes **exactly** the entries
+Uninstall is the mirror image: `installer/uninstall.bat` removes **exactly** the entries
 the installer added (never a whole-file restore, so it cannot undo a mod that
 registered itself later), archives the mod folder to
 `<root>/_autopilotjumpzero-backup/<timestamp>/`, and leaves the rest of the
@@ -508,7 +508,7 @@ restart the server
 EVEJS_AUTOPILOT_JUMP_ZERO=0
 
 # remove it
-uninstall.bat --server "<EveJS root>"      # then rebuild Docker, restart native
+installer\uninstall.bat --server "<EveJS root>"   # then rebuild Docker, restart native
 ```
 
 Docker deployments change the same keys as environment variables on the `server`
@@ -552,13 +552,12 @@ mods/autopilotJumpZero/
   test/run.js               mechanical suite
   test/installer.js         installer round-trip tests
 
-installer/                  ships in the installer ZIP only, not in mods/
+installer/                  development only; pruned from an installed mods/ folder
   install.bat  install.js   detect the EveJS root, copy, register, back up
   uninstall.bat uninstall.js
   status.bat                report what is registered
   lib/deployment.js         root discovery, backup, copy, digests, prune lists
   lib/register.js           pure text transforms for entrypoint.sh / StartServer.bat
-tools/build-package.js      builds dist/ artifacts (fixed timestamps, LF names)
 ```
 
 ---

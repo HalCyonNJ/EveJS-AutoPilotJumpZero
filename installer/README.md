@@ -5,9 +5,10 @@ Makes the EveJS autopilot warp to the target itself instead of stopping about
 destination docks on arrival. No client update is required and the mod never
 edits EveJS source on disk - it transforms one file in memory at startup.
 
-The mod itself is in [`autopilotJumpZero/`](autopilotJumpZero/); see its
-[README](autopilotJumpZero/README.md) for how the seam works and for the
-configuration table.
+This installer lives inside the mod folder, beside `loader.js`. The mod itself
+is the folder above; its [README](../README.md) covers the seam and the
+configuration table, and [HOW-IT-WORKS.md](../HOW-IT-WORKS.md) has the full
+mechanism.
 
 ## Requirements
 
@@ -171,7 +172,7 @@ The autopilot returns to warping 10 km short and approaching the gate.
 ## Verifying the mod itself
 
 ```text
-autopilotJumpZero\RunTests.bat
+..\RunTests.bat
 ```
 
 runs the mod's own suite (config, transform, fail-closed paths, installer

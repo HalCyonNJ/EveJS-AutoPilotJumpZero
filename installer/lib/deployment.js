@@ -17,10 +17,10 @@ const REQUIRED_FILES = Object.freeze([
   path.join("server", "src", "services", "ship", "beyonceService.js"),
 ]);
 // Everything under the mod root that belongs to the development checkout only.
-// The installer prunes these from an already-installed folder and the packager
-// keeps them out of the payload, so one list governs both.
-const DEV_ONLY_DIRECTORIES = Object.freeze(["installer", "tools", "dist", "node_modules", ".git"]);
-const DEV_ONLY_FILES = Object.freeze(["ANNOUNCEMENT.md", "BuildPackage.bat"]);
+// The installer prunes these from an already-installed folder, so an installed
+// mods\autopilotJumpZero holds the payload and nothing else.
+const DEV_ONLY_DIRECTORIES = Object.freeze(["installer", "node_modules", ".git"]);
+const DEV_ONLY_FILES = Object.freeze([]);
 const DOCKER_ENTRYPOINT = path.join("docker", "entrypoint.sh");
 // The native entry point. Deliberately not server/package.json: that file is
 // an input to the image's dependency layer, so editing it forces npm ci to

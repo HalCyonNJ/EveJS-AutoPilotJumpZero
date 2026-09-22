@@ -36,7 +36,7 @@ function parseChildResult(stdout) {
   return JSON.parse(line.slice("RESULT:".length));
 }
 
-// The handler below is the EveJS 0.12.8 shape: the seam line (4-space indent,
+// The handler below is the EveJS 0.12.9 shape: the seam line (4-space indent,
 // inside a 2-space member) must stay byte-identical to the real file.
 const VANILLA_FIXTURE = `"use strict";
 
@@ -167,7 +167,7 @@ test("launcher manifest matches the loader version", () => {
   );
   assert.strictEqual(manifest.version, loaderModule.MOD_VERSION);
   assert.strictEqual(manifest.kind, "loader");
-  assert.ok(manifest.compatibility.evejsVersions.includes("0.12.8"));
+  assert.ok(manifest.compatibility.evejsVersions.includes("0.12.9"));
 });
 
 test("transform rewrites the vanilla seam in place", () => {
@@ -178,7 +178,7 @@ test("transform rewrites the vanilla seam in place", () => {
   assert.ok(result.source.includes(transforms.MARKERS.beyonceService));
   assert.ok(
     result.source.includes(
-      'globalThis[Symbol.for("evejs.autopilotJumpZero")]?.warpInDistanceMeters ?? 0',
+      'globalThis[Symbol.for("evejs.betaAutopilotJumpZero")]?.warpInDistanceMeters ?? 0',
     ),
   );
   assert.ok(!result.source.includes("minimumRange: 10000"));

@@ -20,7 +20,7 @@ echo     Docker  docker/entrypoint.sh
 echo     Native  StartServer.bat
 echo.
 echo   Files that are about to change are backed up under
-echo   ^<EveJS root^>\_autopilotjumpzero-backup\ by default.
+echo   ^<EveJS root^>\_beta-autopilotjumpzero-backup\ by default.
 echo.
 echo   If --server is omitted the installer auto-detects the EveJS root.
 echo.

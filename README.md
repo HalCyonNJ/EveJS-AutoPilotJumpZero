@@ -1,6 +1,6 @@
-# Autopilot Jump Zero for EveJS 0.12.8
+# Autopilot Jump Zero Beta for EveJS 0.12.9
 
-EveJS 0.12.8 mod for both supported deployments - native (Windows) and Docker - that makes the in-game autopilot warp to the target itself instead of stopping roughly 10 km short of it, so a stargate jump fires the moment the warp ends and a station destination docks on arrival.
+EveJS 0.12.9 Beta mod for both supported deployments - native (Windows) and Docker - that makes the in-game autopilot warp to the target itself instead of stopping roughly 10 km short of it, so a stargate jump fires the moment the warp ends and a station destination docks on arrival.
 
 It patches EveJS only in memory. No vendor source file is edited on disk, and the game client is not touched at all.
 
@@ -34,7 +34,7 @@ The retail client autopilot (`eve/client/script/parklife/autopilot.py`) does two
 - it asks the server to warp with `michelle.GetRemotePark().CmdWarpToStuffAutopilot(destinationID)` - a bare target, no range - so the landing point is entirely the server's decision;
 - it decides on its own to jump once the **surface** distance to the gate drops under `const.maxStargateJumpingDistance` (2500 m), and to dock once the surface distance to a station drops under `const.maxDockingDistance` (2500 m).
 
-EveJS 0.12.8 hardcodes that autopilot landing to `{ minimumRange: 10000 }` in `Handle_CmdWarpToStuffAutopilot`. Landing 10 km from the gate puts the ship outside the jump bubble, so the autopilot has to burn an extra approach leg before it can jump - the slow part of travelling.
+EveJS 0.12.9 hardcodes that autopilot landing to `{ minimumRange: 10000 }` in `Handle_CmdWarpToStuffAutopilot`. Landing 10 km from the gate puts the ship outside the jump bubble, so the autopilot has to burn an extra approach leg before it can jump - the slow part of travelling.
 
 Raising the server's stargate jump range does not help, because the client never reads it. The warp-in distance is the only server-side lever, and this mod changes it.
 
@@ -43,11 +43,11 @@ Raising the server's stargate jump range does not help, because the client never
 Exactly one seam, in `server/src/services/ship/beyonceService.js`:
 
 ```js
-// vanilla 0.12.8
+// vanilla 0.12.9
 const result = spaceRuntime.warpToEntity(session, targetID, { minimumRange: 10000 });
 
 // with the mod installed
-const result = spaceRuntime.warpToEntity(session, targetID, { minimumRange: globalThis[Symbol.for("evejs.autopilotJumpZero")]?.warpInDistanceMeters ?? 0 }); /* autopilotJumpZero: autopilot warp-in distance */
+const result = spaceRuntime.warpToEntity(session, targetID, { minimumRange: globalThis[Symbol.for("evejs.betaAutopilotJumpZero")]?.warpInDistanceMeters ?? 0 }); /* beta-autopilotJumpZero: autopilot warp-in distance */
 ```
 
 Only the autopilot warp is affected. Manual "Warp to", fleet warps, scan-result warps, agent/dungeon warps and every other warp call carry their own explicit range and are left untouched.
@@ -59,10 +59,11 @@ With the default of `0`:
 
 ## Install
 
-Get this folder into `<EveJS root>\mods\autopilotJumpZero` - clone the repository, copy the
+Get this folder into `<EveJS root>\mods\beta-autopilotJumpZero` - clone the repository, copy the
 folder, or take `Source code (zip)` from the release you want - and run the installer from inside it.
-The folder name matters: the preload points at `mods\autopilotJumpZero`, so a GitHub archive that
-unpacks as `EveJS-AutoPilotJumpZero-main` has to be renamed to that.
+
+The folder name matters: the preload points at `mods\beta-autopilotJumpZero`, so a GitHub archive
+whose top-level folder is named `EveJS-AutoPilotJumpZero-*` has to be renamed to that.
 
 ### Installer (native and Docker)
 
@@ -73,16 +74,16 @@ finds the root itself. Use `--server "C:\path\to\EveJS"` only to override that s
 installer\install.bat
 ```
 
-It copies this folder to `<EveJS root>\mods\autopilotJumpZero` and registers the preload in
+It copies this folder to `<EveJS root>\mods\beta-autopilotJumpZero` and registers the preload in
 every deployment it finds:
 
 | Deployment | Registered in | Entry added |
 |---|---|---|
-| Docker | `docker/entrypoint.sh`, in both `run_server()` and `run_all()` | `--require /app/mods/autopilotJumpZero/loader.js` |
-| Native | `StartServer.bat`, whose `NODE_OPTIONS` both `npm start` branches inherit | `NODE_OPTIONS=<existing> --require "…\mods\autopilotJumpZero\loader.js"` (appended) |
+| Docker | `docker/entrypoint.sh`, in both `run_server()` and `run_all()` | `--require /app/mods/beta-autopilotJumpZero/loader.js` |
+| Native | `StartServer.bat`, whose `NODE_OPTIONS` both `npm start` branches inherit | `NODE_OPTIONS=<existing> --require "…\mods\beta-autopilotJumpZero\loader.js"` (appended) |
 
 Both registrations are idempotent, and every file the installer rewrites is
-copied to `<EveJS root>\_autopilotjumpzero-backup\<timestamp>\` first. The
+copied to `<EveJS root>\_beta-autopilotjumpzero-backup\<timestamp>\` first. The
 native block **appends** to `NODE_OPTIONS` instead of claiming it, so it composes
 with other loader mods; a block left behind by v1.1.1 is upgraded in place by
 re-running the installer.
@@ -99,37 +100,37 @@ Native : restart the server with StartServer.bat
 
 ### EveJS Launcher (native)
 
-No ZIP is published - build one from this folder:
+No separate mod ZIP is published - build one from this folder for the launcher:
 
-1. Zip this folder so `autopilotJumpZero\` is the archive root and
+1. Zip this folder so `beta-autopilotJumpZero\` is the archive root and
    `evejs-launcher.mod.json` sits inside it, beside `loader.js`.
 2. Open **Mods** in EveJS Launcher and click **Add ZIP**.
 3. Import it and turn on the toggle beside **Autopilot Jump Zero**.
 4. Restart Game.
 
-Keep the folder inside the ZIP named `autopilotJumpZero`. The manifest describes
+Keep the folder inside the ZIP named `beta-autopilotJumpZero`. The manifest describes
 the launcher integration only; Docker is handled by `docker/entrypoint.sh`.
 
 ### Manual
 
-1. Copy this folder to `mods/autopilotJumpZero` inside your EveJS install.
+1. Copy this folder to `mods/beta-autopilotJumpZero` inside your EveJS install.
 2. Preload the loader before any other server module, next to the other `--require` entries:
 
 ```text
 # Native, run from the server directory
-node --require ../mods/autopilotJumpZero/loader.js .
+node --require ../mods/beta-autopilotJumpZero/loader.js .
 
 # Native, without editing a vendor file. NODE_OPTIONS is a list, so append to
 # it: overwriting it disables every other loader mod you have installed.
 # Forward slashes are required - Node's NODE_OPTIONS parser eats backslashes,
 # turning C:\a\loader.js into C:aloader.js.
-NODE_OPTIONS=<existing> --require <evejs>/mods/autopilotJumpZero/loader.js
+NODE_OPTIONS=<existing> --require <evejs>/mods/beta-autopilotJumpZero/loader.js
 
 # Docker, in docker/entrypoint.sh - both run_server() and run_all()
-    --require /app/mods/autopilotJumpZero/loader.js \
+    --require /app/mods/beta-autopilotJumpZero/loader.js \
 ```
 
-3. Restart the server. A `[autopilotJumpZero] v1.1.1 active — autopilot warp-in distance 0 m` line confirms it.
+3. Restart the server. A `[beta-autopilotJumpZero] v1.1.2-beta.1 active — autopilot warp-in distance 0 m` line confirms it.
 
 No client update is required and none is produced.
 
@@ -168,7 +169,7 @@ This includes a server whose own source already carries a config-driven autopilo
 
 The mod is inert in worker threads and refuses to install if the target module was already loaded.
 
-Verified against EveJS 0.12.8 (`beyonceService.js`, build shipped with SDE 3396210).
+Verified against EveJS 0.12.9 (`beyonceService.js`, build shipped with SDE 3396210).
 
 ## Verification
 
@@ -178,16 +179,16 @@ RunTests.bat
 node test/run.js
 ```
 
-The suite covers the config surface, the transform, idempotency, the fail-closed paths, the worker-thread guard, and a child-process run that proves the installed hook actually feeds the configured range into the autopilot handler.
+The suite covers the config surface, the transform, idempotency, the fail-closed paths, the worker-thread guard, and a child-process run that proves the installed hook actually feeds the configured range into the autopilot handler. The development checkout passes 28/28 checks; an installed payload passes 18/18 checks.
 
-On a live server you can confirm the effect from the server log: `CmdWarpToStuffAutopilot` is followed within a second by `CmdStargateJump` for the same character, and no `CmdFollowBall` / `CmdSetSpeedFraction` appears between them.
+In the server log, confirmation is the same: `CmdWarpToStuffAutopilot` is followed within a second by `CmdStargateJump` for the same character, with no `CmdFollowBall` / `CmdSetSpeedFraction` in between.
 
 ## Uninstall
 
 1. Stop the server.
 2. Run `installer\uninstall.bat --server "<EveJS root>"`, or turn
-   the mod off in the launcher, or remove the `--require .../autopilotJumpZero/loader.js`
-   entries and the `mods/autopilotJumpZero` folder by hand.
+   the mod off in the launcher, or remove the `--require .../beta-autopilotJumpZero/loader.js`
+   entries and the `mods/beta-autopilotJumpZero` folder by hand.
 3. Rebuild first if Docker is used, then restart.
 
 No source reversal is required: nothing on disk was modified.

@@ -15,8 +15,8 @@ const NATIVE_MODS_PREFIX = "../mods";
 // that aborts on Node 24. StartServer.bat is excluded from the Docker build
 // context, so preloading through it cannot disturb an image build.
 const START_SERVER_ANCHOR = 'set "EVEJS_PROXY_LOCAL_INTERCEPT=1"';
-const START_SERVER_BEGIN = "rem --- autopilotJumpZero: preload the server-side loader ---";
-const START_SERVER_END = "rem --- autopilotJumpZero: end autopilotJumpZero preload ---";
+const START_SERVER_BEGIN = "rem --- beta-autopilotJumpZero: preload the server-side loader ---";
+const START_SERVER_END = "rem --- beta-autopilotJumpZero: end beta-autopilotJumpZero preload ---";
 
 // The only `node ... \` invocation in docker/entrypoint.sh whose continuation
 // carries this flag is a server launch, and Node applies --require to it no
@@ -226,7 +226,7 @@ function applyStartServerPreload(text, options) {
     return {
       ok: false,
       changed: false,
-      reason: "the existing autopilotJumpZero preload block has no end marker",
+      reason: "the existing beta-autopilotJumpZero preload block has no end marker",
     };
   }
   const anchor = lines.findIndex((line) => stripCarriageReturn(line).trim() === START_SERVER_ANCHOR);

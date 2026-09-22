@@ -9,10 +9,10 @@
  * another mod that registered itself later.
  *
  * Usage:
- *   node uninstall.js --server "D:\eve\v0.12.8"
- *   node uninstall.js --server "D:\eve\v0.12.8" --dry-run
- *   node uninstall.js --server "D:\eve\v0.12.8" --keep-files
- *   node uninstall.js --status --server "D:\eve\v0.12.8"
+ *   node uninstall.js --server "D:\eve\v0.12.9"
+ *   node uninstall.js --server "D:\eve\v0.12.9" --dry-run
+ *   node uninstall.js --server "D:\eve\v0.12.9" --keep-files
+ *   node uninstall.js --status --server "D:\eve\v0.12.9"
  */
 
 const fs = require("node:fs");
@@ -62,7 +62,7 @@ function resolveRoot(options) {
   if (explicit) {
     const resolved = path.resolve(explicit);
     if (!deployment.isEveJsRoot(resolved)) {
-      fail(`${resolved} does not look like an EveJS 0.12.8 root (server/index.js and beyonceService.js must exist)`);
+      fail(`${resolved} does not look like an EveJS 0.12.9 root (server/index.js and beyonceService.js must exist)`);
     }
     return resolved;
   }

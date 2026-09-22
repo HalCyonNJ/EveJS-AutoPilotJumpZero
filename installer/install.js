@@ -7,7 +7,7 @@
  * transforms one file in memory. What has to be registered is the preload
  * itself, and each deployment offers a different place to do it:
  *
- *   Docker  docker/entrypoint.sh   --require /app/mods/autopilotJumpZero/loader.js
+ *   Docker  docker/entrypoint.sh   --require /app/mods/beta-autopilotJumpZero/loader.js
  *   Native  StartServer.bat        NODE_OPTIONS=%NODE_OPTIONS% --require %EVEJS_REPO_ROOT%/mods/...
  *                                  (inherited by both npm start branches)
  *
@@ -17,10 +17,10 @@
  * loader mods instead of racing them for the variable.
  *
  * Usage:
- *   node install.js --server "D:\eve\v0.12.8"
- *   node install.js --server "D:\eve\v0.12.8" --dry-run
- *   node install.js --server "D:\eve\v0.12.8" --docker-only
- *   node install.js --status --server "D:\eve\v0.12.8"
+ *   node install.js --server "D:\eve\v0.12.9"
+ *   node install.js --server "D:\eve\v0.12.9" --dry-run
+ *   node install.js --server "D:\eve\v0.12.9" --docker-only
+ *   node install.js --status --server "D:\eve\v0.12.9"
  */
 
 const fs = require("node:fs");
@@ -75,7 +75,7 @@ function parseArgs(argv) {
 }
 
 // The payload is the mod folder shipped beside the installer (`mod/` and
-// `autopilotJumpZero/` are both accepted), and this installer's parent
+// `beta-autopilotJumpZero/` are both accepted), and this installer's parent
 // directory in the development tree, where the mod is the git checkout itself.
 function payloadCandidates() {
   return [
@@ -126,7 +126,7 @@ function resolveRoot(options) {
   if (explicit) {
     const resolved = path.resolve(explicit);
     if (!deployment.isEveJsRoot(resolved)) {
-      fail(`${resolved} does not look like an EveJS 0.12.8 root (server/index.js and beyonceService.js must exist)`);
+      fail(`${resolved} does not look like an EveJS 0.12.9 root (server/index.js and beyonceService.js must exist)`);
     }
     return resolved;
   }
@@ -318,10 +318,10 @@ function main() {
     out("    Native : restart the server with StartServer.bat");
   }
   out("");
-  out(`  Confirm a boot line: [autopilotJumpZero] v${payload.version} active`);
+  out(`  Confirm a boot line: [beta-autopilotJumpZero] v${payload.version} active`);
   out("");
   out("  Configuration");
-  out("    Native : mods/autopilotJumpZero/.env (EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS)");
+  out("    Native : mods/beta-autopilotJumpZero/.env (EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS)");
   out("    Docker : .env is excluded from the image; add the same keys to the");
   out("             server service `environment:` in compose.yaml.");
   out("             The shipped defaults (enabled, 0 m) need no configuration.");

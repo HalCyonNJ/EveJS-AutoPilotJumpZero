@@ -1,8 +1,8 @@
 {
   "schemaVersion": 3,
-  "id": "autopilotjumpzero",
-  "displayName": "Autopilot Jump Zero",
-  "version": "1.1.1",
+  "id": "beta-autopilotJumpZero",
+  "displayName": "Autopilot Jump Zero (Beta)",
+  "version": "1.1.2-beta.1",
   "description": "Autopilot warps land on the target, so stargate jumps fire the moment the warp ends instead of after an approach leg.",
   "kind": "loader",
   "supportedBackends": [
@@ -14,7 +14,7 @@
   "restart": "game_server",
   "compatibility": {
     "evejsVersions": [
-      "0.12.8"
+      "0.12.9"
     ]
   }
 }

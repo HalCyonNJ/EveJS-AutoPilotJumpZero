@@ -6,8 +6,8 @@
 > function names and the exact strings the mod matches on are all quoted, so a
 > reader can jump straight to the code.
 
-**Target:** EveJS 0.12.8 (`beyonceService.js`, build shipped with SDE 3396210)
-**Mod version:** 1.1.1 · **Manifest kind:** `loader` · **Backends:** native (Docker is registered separately, see §8)
+**Target:** EveJS 0.12.9 (`beyonceService.js`, build shipped with SDE 3396210)
+**Mod version:** 1.1.2-beta.1 · **Manifest kind:** `loader` · **Backends:** native (Docker is registered separately, see §8)
 **Runtime requirement:** Node.js 18+ (the installer needs it on `PATH` too)
 
 ---
@@ -26,7 +26,7 @@ starting*. Autopilot warps then land on the target: a stargate jump goes out the
 moment the warp ends, and a station destination docks on arrival.
 
 - No file on disk is modified - not EveJS, not the mod's own copy of it.
-- No game client change - **there is nothing to distribute to players**.
+- No game client change - **there is nothing to install on the game client**.
 - One setting, and it fails closed rather than guessing (§5).
 
 ---
@@ -87,11 +87,11 @@ travel time. This mod pulls that lever.
 ```
 
 `10000` is a literal. There is no config key, no environment variable and no
-constant for it anywhere else in 0.12.8 - this call site is the whole story.
+constant for it anywhere else in 0.12.9 - this call site is the whole story.
 
-### 1.4 The consequence for a player
+### 1.4 The consequence in game
 
-| Leg | Vanilla 0.12.8 | With this mod (default `0`) |
+| Leg | Vanilla 0.12.9 | With this mod (default `0`) |
 |---|---|---|
 | Warp to gate | warp ends 10,000 m from the gate | warp ends on the gate |
 | Approach leg | ~7,500 m at sub-warp speed | none |
@@ -107,11 +107,11 @@ constant for it anywhere else in 0.12.8 - this call site is the whole story.
 Exactly one line changes, in `server/src/services/ship/beyonceService.js`:
 
 ```js
-// vanilla 0.12.8
+// vanilla 0.12.9
 const result = spaceRuntime.warpToEntity(session, targetID, { minimumRange: 10000 });
 
 // as seen by the running server with this mod installed (one source line)
-const result = spaceRuntime.warpToEntity(session, targetID, { minimumRange: globalThis[Symbol.for("evejs.autopilotJumpZero")]?.warpInDistanceMeters ?? 0 }); /* autopilotJumpZero: autopilot warp-in distance */
+const result = spaceRuntime.warpToEntity(session, targetID, { minimumRange: globalThis[Symbol.for("evejs.betaAutopilotJumpZero")]?.warpInDistanceMeters ?? 0 }); /* beta-autopilotJumpZero: autopilot warp-in distance */
 ```
 
 That is the complete gameplay change. Nothing else in the file, and no other
@@ -124,7 +124,7 @@ Three reasons, all deliberate:
 - **The value stays configurable at runtime** without re-transforming anything:
   the running line reads whatever the loader published at startup, so the
   distance can be retuned (§6) without touching the transform.
-- **`Symbol.for("evejs.autopilotJumpZero")` is a registry symbol**, so any other
+- **`Symbol.for("evejs.betaAutopilotJumpZero")` is a registry symbol**, so any other
   server-side code can find the mod's API without `require`-ing the mod or
   depending on its path - and the mod can be dropped into any load order.
 - **`?? 0` is a fail-safe default, not an accident.** If the API is missing (for
@@ -138,7 +138,7 @@ Three reasons, all deliberate:
 The transformed line ends with:
 
 ```js
-/* autopilotJumpZero: autopilot warp-in distance */
+/* beta-autopilotJumpZero: autopilot warp-in distance */
 ```
 
 That marker is how the mod recognises **its own** work later (§4.2): a file that
@@ -158,24 +158,24 @@ no `require` inside EveJS is edited.
 
 ```text
 # Docker (docker/entrypoint.sh, both run_server() and run_all())
-    --require /app/mods/autopilotJumpZero/loader.js \
+    --require /app/mods/beta-autopilotJumpZero/loader.js \
 
 # Native (StartServer.bat, inherited by both npm start branches)
 # appended to the list, keeping whatever another loader mod put there
-NODE_OPTIONS=<existing> --require "<root>/mods/autopilotJumpZero/loader.js"
+NODE_OPTIONS=<existing> --require "<root>/mods/beta-autopilotJumpZero/loader.js"
 
 # Native, manual
-node --require ../mods/autopilotJumpZero/loader.js .
+node --require ../mods/beta-autopilotJumpZero/loader.js .
 ```
 
 `loader.js` computes the EveJS root from its own location:
 
 ```js
-const MOD_DIR = __dirname;                              // .../mods/autopilotJumpZero
+const MOD_DIR = __dirname;                              // .../mods/beta-autopilotJumpZero
 const RUNTIME_ROOT = path.resolve(MOD_DIR, "../..");    // the EveJS root
 ```
 
-So the mod must live at `<EveJS root>/mods/autopilotJumpZero/`. That is the only
+So the mod must live at `<EveJS root>/mods/beta-autopilotJumpZero/`. That is the only
 installation requirement.
 
 ### 3.2 Step 1 - gates before anything is installed
@@ -185,7 +185,7 @@ installation requirement.
 | Gate | Condition | Result |
 |---|---|---|
 | Worker threads | `isMainThread === false` | inert, reason `worker-thread` |
-| Double install | `globalThis.__autopilotJumpZeroLoaderInstalled` already set | inert, reason `already-installed` |
+| Double install | `globalThis.__betaAutopilotJumpZeroLoaderInstalled` already set | inert, reason `already-installed` |
 | Disabled | `EVEJS_AUTOPILOT_JUMP_ZERO=0` | inert, logs "mod disabled", vanilla behaviour |
 | Bad config | any value fails validation | **no hook installed**, each problem logged |
 | Viability | the target file is not the expected shape | **no hook installed**, each failing check logged |
@@ -255,8 +255,8 @@ Two extra guards protect against ordering hazards:
 ### 3.6 Step 5 - publish the API
 
 ```js
-globalThis[Symbol.for("evejs.autopilotJumpZero")] = Object.freeze({
-  version: "1.1.1",
+globalThis[Symbol.for("evejs.betaAutopilotJumpZero")] = Object.freeze({
+  version: "1.1.2-beta.1",
   warpInDistanceMeters: 0,   // the configured value
   config,                    // the full resolved config, frozen
 });
@@ -397,7 +397,7 @@ flowchart LR
   E -->|"still too far"| H["Approach leg at sub-warp speed<br/>(the slow part)"]
 ```
 
-`X` = `10000` in vanilla 0.12.8, `0` with this mod. The mod only moves `X`; every
+`X` = `10000` in vanilla 0.12.9, `0` with this mod. The mod only moves `X`; every
 arrow to its right is the game's own behaviour and is left alone.
 
 In one sentence: *the client asks for a warp without a range, the server picks
@@ -407,15 +407,15 @@ the range, and this mod makes the server pick zero.*
 
 ## 8. Registration, per deployment
 
-The mod is a preload, so it has to be registered once per launch path. There are
-only three places that can actually start the EveJS server, and the installer
-(`installer/install.bat` → `installer/install.js`) covers all of them idempotently.
+The mod is a preload, so it has to be registered once per launch path. The
+installer (`installer/install.bat` → `installer/install.js`) covers every supported
+path idempotently.
 
 | Deployment | File | Entry added | Rebuild needed? |
 |---|---|---|---|
-| Docker, server-only container (`this project's compose.yaml`) | `docker/entrypoint.sh`, `run_server()` | `--require /app/mods/autopilotJumpZero/loader.js` | yes - `mods/` is baked into the image |
+| Docker, separate server service (Docker Compose project) | `docker/entrypoint.sh`, `run_server()` | `--require /app/mods/beta-autopilotJumpZero/loader.js` | yes - `mods/` is baked into the image |
 | Docker, single-container "all" mode (the image's default `CMD ["all"]`) | `docker/entrypoint.sh`, `run_all()` | same | yes |
-| Native Windows | `StartServer.bat` | `NODE_OPTIONS=<existing> --require "<root>/mods/autopilotJumpZero/loader.js"` (appended) | no |
+| Native Windows | `StartServer.bat` | `NODE_OPTIONS=<existing> --require "<root>/mods/beta-autopilotJumpZero/loader.js"` (appended) | no |
 | EveJS Launcher | launcher mod list | enable the entry from `evejs-launcher.mod.json` | no |
 
 Three deliberate implementation details, all learned the hard way:
@@ -451,15 +451,15 @@ Three deliberate implementation details, all learned the hard way:
 Uninstall is the mirror image: `installer/uninstall.bat` removes **exactly** the entries
 the installer added (never a whole-file restore, so it cannot undo a mod that
 registered itself later), archives the mod folder to
-`<root>/_autopilotjumpzero-backup/<timestamp>/`, and leaves the rest of the
+`<root>/_beta-autopilotjumpzero-backup/<timestamp>/`, and leaves the rest of the
 checkout alone. `--keep-files` unregisters without deleting the folder.
 
 ---
 
 ## 9. What is verified
 
-`RunTests.bat` (or `node test/run.js`) runs the mechanical suite. 25 checks, all
-passing on Node 24 and on `node:20-alpine`, grouped as:
+`RunTests.bat` (or `node test/run.js`) runs the mechanical suite. The development
+checkout has 28 checks, all passing on Node 24, grouped as:
 
 | Group | Covers |
 |---|---|
@@ -469,14 +469,13 @@ passing on Node 24 and on `node:20-alpine`, grouped as:
 | viability (1) | a tree without the autopilot handler is rejected |
 | loader guards (1) | the loader stays inert in worker threads |
 | child process (2) | the installed hook actually drives the handler at `0 m` and at `15000 m` - i.e. the value really reaches `warpToEntity`, end to end |
-| live tree (1) | the real `D:\Eve\EveJS` tree still reports a recognised seam state |
-| installer (8) | Docker preload added to every server launch, insertion is idempotent, removal restores the fixture byte for byte, refusal when no anchor exists; native preload added to `StartServer.bat` and refused without an anchor; a full install → reinstall → uninstall round trip that asserts `server/package.json` stays byte-identical |
+| live tree (1) | a real EveJS checkout still reports a recognised seam state |
+| installer (11) | Docker preload insertion, idempotency and removal; refusal when no launch path exists; native preload insertion, legacy upgrade, damaged-block refusal and composition with another loader mod; an end-to-end install → reinstall → uninstall round trip that leaves `server/package.json` byte-identical; and live-tree launch probes |
 
-On a live server the effect is visible in the log: `CmdWarpToStuffAutopilot` is
-followed within about a second by `CmdStargateJump` for the same character, with
-no `CmdFollowBall` or `CmdSetSpeedFraction` in between - i.e. the ship jumped
-instead of burning towards the gate. A nine-hop autopilot test run on this
-project's server produced exactly that pattern on every hop, 12-28 s per hop.
+In game on EveJS 0.12.9, the verification run showed
+`CmdWarpToStuffAutopilot` followed by `CmdStargateJump` for the same character,
+with no `CmdFollowBall` or `CmdSetSpeedFraction` in between. The in-game
+acceptance run also completed without issues.
 
 ---
 
@@ -490,8 +489,8 @@ project's server produced exactly that pattern on every hop, 12-28 s per hop.
   changes where an autopilot warp stops.
 - **It does not write to disk.** No vendor file, no lock file, no generated
   source. Uninstall is removal of the registration, not a revert.
-- **It does not ship or require anything on the client side.** Nothing for your
-  players to download.
+- **It does not ship or require anything on the client side.** There is nothing
+  for a game client to install.
 - **It does not disable itself for the faster docking.** Docking on arrival is a
   consequence of the same seam, not a separate feature.
 
@@ -501,7 +500,7 @@ project's server produced exactly that pattern on every hop, 12-28 s per hop.
 
 ```text
 # try the retail-style crawl again (native example)
-mods\autopilotJumpZero\.env ->  EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS=15000
+mods\beta-autopilotJumpZero\.env ->  EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS=15000
 restart the server
 
 # turn the mod off entirely, keeping it installed
@@ -521,8 +520,8 @@ needed to change a *value*, only to add or remove the *mod*.
 
 | Log line | Meaning |
 |---|---|
-| `[autopilotJumpZero] v1.1.1 active - autopilot warp-in distance 0 m` | installed and enabled |
-| `[autopilotJumpZero] in-memory transform applied: beyonceService autopilot warp-in distance 0 m` | the seam was actually rewritten in memory |
+| `[beta-autopilotJumpZero] v1.1.2-beta.1 active - autopilot warp-in distance 0 m` | installed and enabled |
+| `[beta-autopilotJumpZero] in-memory transform applied: beyonceService autopilot warp-in distance 0 m` | the seam was actually rewritten in memory |
 | `... in-memory transform already present:` | the file already carried the mod's own seam |
 | `viability gate failed - no hooks installed` (+ reason lines) | the target file is not the shape the mod expects → **server runs vanilla** |
 | `the autopilot warp-in distance is already owned by a server-side patch` | another patch owns the seam → **server runs that patch's behaviour** |
@@ -540,7 +539,7 @@ for the mod being present.
 ## 13. File map
 
 ```text
-mods/autopilotJumpZero/
+mods/beta-autopilotJumpZero/
   loader.js                 entry point: gates, Module._load hook, API publication
   config.js                 env/.env/default resolution + validation
   lib/sourceTransforms.js   the seam, the anchors, the state machine

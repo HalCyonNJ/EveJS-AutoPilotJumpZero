@@ -1,6 +1,6 @@
-# Autopilot Jump Zero Beta for EveJS 0.12.9
+# Autopilot Jump Zero for EveJS 0.12.9
 
-EveJS 0.12.9 Beta mod for both supported deployments - native (Windows) and Docker - that makes the in-game autopilot warp to the target itself instead of stopping roughly 10 km short of it, so a stargate jump fires the moment the warp ends and a station destination docks on arrival.
+EveJS 0.12.9 mod for both supported deployments - native (Windows) and Docker - that makes the in-game autopilot warp to the target itself instead of stopping roughly 10 km short of it, so a stargate jump fires the moment the warp ends and a station destination docks on arrival.
 
 It patches EveJS only in memory. No vendor source file is edited on disk, and the game client is not touched at all.
 
@@ -47,7 +47,7 @@ Exactly one seam, in `server/src/services/ship/beyonceService.js`:
 const result = spaceRuntime.warpToEntity(session, targetID, { minimumRange: 10000 });
 
 // with the mod installed
-const result = spaceRuntime.warpToEntity(session, targetID, { minimumRange: globalThis[Symbol.for("evejs.betaAutopilotJumpZero")]?.warpInDistanceMeters ?? 0 }); /* beta-autopilotJumpZero: autopilot warp-in distance */
+const result = spaceRuntime.warpToEntity(session, targetID, { minimumRange: globalThis[Symbol.for("evejs.autopilotJumpZero")]?.warpInDistanceMeters ?? 0 }); /* autopilotJumpZero: autopilot warp-in distance */
 ```
 
 Only the autopilot warp is affected. Manual "Warp to", fleet warps, scan-result warps, agent/dungeon warps and every other warp call carry their own explicit range and are left untouched.
@@ -59,10 +59,10 @@ With the default of `0`:
 
 ## Install
 
-Get this folder into `<EveJS root>\mods\beta-autopilotJumpZero` - clone the repository, copy the
+Get this folder into `<EveJS root>\mods\autopilotJumpZero` - clone the repository, copy the
 folder, or take `Source code (zip)` from the release you want - and run the installer from inside it.
 
-The folder name matters: the preload points at `mods\beta-autopilotJumpZero`, so a GitHub archive
+The folder name matters: the preload points at `mods\autopilotJumpZero`, so a GitHub archive
 whose top-level folder is named `EveJS-AutoPilotJumpZero-*` has to be renamed to that.
 
 ### Installer (native and Docker)
@@ -74,16 +74,16 @@ finds the root itself. Use `--server "C:\path\to\EveJS"` only to override that s
 installer\install.bat
 ```
 
-It copies this folder to `<EveJS root>\mods\beta-autopilotJumpZero` and registers the preload in
+It copies this folder to `<EveJS root>\mods\autopilotJumpZero` and registers the preload in
 every deployment it finds:
 
 | Deployment | Registered in | Entry added |
 |---|---|---|
-| Docker | `docker/entrypoint.sh`, in both `run_server()` and `run_all()` | `--require /app/mods/beta-autopilotJumpZero/loader.js` |
-| Native | `StartServer.bat`, whose `NODE_OPTIONS` both `npm start` branches inherit | `NODE_OPTIONS=<existing> --require "…\mods\beta-autopilotJumpZero\loader.js"` (appended) |
+| Docker | `docker/entrypoint.sh`, in both `run_server()` and `run_all()` | `--require /app/mods/autopilotJumpZero/loader.js` |
+| Native | `StartServer.bat`, whose `NODE_OPTIONS` both `npm start` branches inherit | `NODE_OPTIONS=<existing> --require "…\mods\autopilotJumpZero\loader.js"` (appended) |
 
 Both registrations are idempotent, and every file the installer rewrites is
-copied to `<EveJS root>\_beta-autopilotjumpzero-backup\<timestamp>\` first. The
+copied to `<EveJS root>\_autopilotjumpzero-backup\<timestamp>\` first. The
 native block **appends** to `NODE_OPTIONS` instead of claiming it, so it composes
 with other loader mods; a block left behind by v1.1.1 is upgraded in place by
 re-running the installer.
@@ -102,35 +102,35 @@ Native : restart the server with StartServer.bat
 
 No separate mod ZIP is published - build one from this folder for the launcher:
 
-1. Zip this folder so `beta-autopilotJumpZero\` is the archive root and
+1. Zip this folder so `autopilotJumpZero\` is the archive root and
    `evejs-launcher.mod.json` sits inside it, beside `loader.js`.
 2. Open **Mods** in EveJS Launcher and click **Add ZIP**.
 3. Import it and turn on the toggle beside **Autopilot Jump Zero**.
 4. Restart Game.
 
-Keep the folder inside the ZIP named `beta-autopilotJumpZero`. The manifest describes
+Keep the folder inside the ZIP named `autopilotJumpZero`. The manifest describes
 the launcher integration only; Docker is handled by `docker/entrypoint.sh`.
 
 ### Manual
 
-1. Copy this folder to `mods/beta-autopilotJumpZero` inside your EveJS install.
+1. Copy this folder to `mods/autopilotJumpZero` inside your EveJS install.
 2. Preload the loader before any other server module, next to the other `--require` entries:
 
 ```text
 # Native, run from the server directory
-node --require ../mods/beta-autopilotJumpZero/loader.js .
+node --require ../mods/autopilotJumpZero/loader.js .
 
 # Native, without editing a vendor file. NODE_OPTIONS is a list, so append to
 # it: overwriting it disables every other loader mod you have installed.
 # Forward slashes are required - Node's NODE_OPTIONS parser eats backslashes,
 # turning C:\a\loader.js into C:aloader.js.
-NODE_OPTIONS=<existing> --require <evejs>/mods/beta-autopilotJumpZero/loader.js
+NODE_OPTIONS=<existing> --require <evejs>/mods/autopilotJumpZero/loader.js
 
 # Docker, in docker/entrypoint.sh - both run_server() and run_all()
-    --require /app/mods/beta-autopilotJumpZero/loader.js \
+    --require /app/mods/autopilotJumpZero/loader.js \
 ```
 
-3. Restart the server. A `[beta-autopilotJumpZero] v1.1.2-beta.1 active — autopilot warp-in distance 0 m` line confirms it.
+3. Restart the server. A `[autopilotJumpZero] v1.1.2 active — autopilot warp-in distance 0 m` line confirms it.
 
 No client update is required and none is produced.
 
@@ -187,8 +187,8 @@ In the server log, confirmation is the same: `CmdWarpToStuffAutopilot` is follow
 
 1. Stop the server.
 2. Run `installer\uninstall.bat --server "<EveJS root>"`, or turn
-   the mod off in the launcher, or remove the `--require .../beta-autopilotJumpZero/loader.js`
-   entries and the `mods/beta-autopilotJumpZero` folder by hand.
+   the mod off in the launcher, or remove the `--require .../autopilotJumpZero/loader.js`
+   entries and the `mods/autopilotJumpZero` folder by hand.
 3. Rebuild first if Docker is used, then restart.
 
 No source reversal is required: nothing on disk was modified.

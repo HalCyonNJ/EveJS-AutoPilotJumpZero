@@ -9,16 +9,16 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const MOD_ID = "beta-autopilotJumpZero";
+const MOD_ID = "autopilotJumpZero";
 const PAYLOAD_DIRNAME = "mod";
-const BACKUP_DIRNAME = "_beta-autopilotjumpzero-backup";
+const BACKUP_DIRNAME = "_autopilotjumpzero-backup";
 const REQUIRED_FILES = Object.freeze([
   path.join("server", "index.js"),
   path.join("server", "src", "services", "ship", "beyonceService.js"),
 ]);
 // Everything under the mod root that belongs to the development checkout only.
 // The installer prunes these from an already-installed folder, so an installed
-// mods\beta-autopilotJumpZero holds the payload and nothing else.
+// mods\autopilotJumpZero holds the payload and nothing else.
 const DEV_ONLY_DIRECTORIES = Object.freeze(["installer", "node_modules", ".git"]);
 const DEV_ONLY_FILES = Object.freeze([]);
 const DOCKER_ENTRYPOINT = path.join("docker", "entrypoint.sh");
@@ -141,7 +141,7 @@ function timestamp(date = new Date()) {
   );
 }
 
-// Archives a file or directory under <EveJS root>/_beta-autopilotjumpzero-backup/ so
+// Archives a file or directory under <EveJS root>/_autopilotjumpzero-backup/ so
 // uninstall.bat can always restore something by hand, even after a later mod
 // rewrites the same lines again.
 function archivePath(root, sourcePath, backupRoot) {

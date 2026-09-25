@@ -1,19 +1,19 @@
 # Changelog
 
-Autopilot Jump Zero for EveJS 0.12.9 Beta. Newest release first.
+Autopilot Jump Zero for EveJS 0.12.9. Newest release first.
 
 Every release is a drop-in replacement for the one before it: put the folder at
-`mods\beta-autopilotJumpZero` and run `installer\install.bat`. No vendor file is edited on disk, no
+`mods\autopilotJumpZero` and run `installer\install.bat`. No vendor file is edited on disk, no
 game client installs anything, and an existing `.env` is never overwritten.
 
 ---
 
-## 1.1.2-beta.1 - 2026-09-23
+## 1.1.2 - 2026-09-25
 
-**Beta port for EveJS 0.12.9.**
+**EveJS 0.12.9 release.**
 
 - Targets EveJS 0.12.9 while keeping the same single in-memory autopilot seam.
-- Uses the isolated `beta-autopilotJumpZero` mod identity, API symbol, preload path and backup path.
+- Uses the `autopilotJumpZero` mod identity, API symbol, preload path and backup path.
 - No gameplay logic changes from 1.1.1: autopilot still warps to the target surface by default, and every other warp path is untouched.
 - Verified with the development suite at **28/28 PASS** and with the installed payload at **18/18 PASS**.
 - In-game acceptance on EveJS 0.12.9 confirmed `CmdWarpToStuffAutopilot` followed by `CmdStargateJump`, with no `CmdFollowBall` or `CmdSetSpeedFraction` in between.

@@ -15,7 +15,7 @@ echo     uninstall.bat --server "C:\path\to\EveJS" --dry-run
 echo     uninstall.bat --server "C:\path\to\EveJS" --keep-files
 echo.
 echo   Removes the preload from both deployments and archives the mod
-echo   folder under ^<EveJS root^>\_beta-autopilotjumpzero-backup\.
+echo   folder under ^<EveJS root^>\_autopilotjumpzero-backup\.
 echo.
 echo ------------------------------------------------------------
 echo.

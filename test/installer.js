@@ -10,7 +10,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
-const MOD_ID = "beta-autopilotJumpZero";
+const MOD_ID = "autopilotJumpZero";
 
 const ENTRYPOINT_FIXTURE = [
   "#!/usr/bin/env bash",
@@ -270,7 +270,7 @@ function register(harness) {
       console.log("     SKIP the composition probe needs cmd.exe");
       return;
     }
-    const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "beta-autopilotjumpzero-compose-"));
+    const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "autopilotjumpzero-compose-"));
     try {
       const root = path.join(workdir, "EveJS");
       for (const id of [MOD_ID, "otherLoaderMod"]) {
@@ -316,7 +316,7 @@ function register(harness) {
       const result = spawnSync("cmd.exe", ["/c", batFile], { encoding: "utf8", timeout: 60000 });
       assert.strictEqual(result.status, 0, result.stderr || result.stdout);
       assert.match(result.stdout, /LOADED:otherLoaderMod/u, "the neighbour must keep its preload");
-      assert.match(result.stdout, /LOADED:beta-autopilotJumpZero/u, "this mod must not be silenced by the neighbour");
+      assert.match(result.stdout, /LOADED:autopilotJumpZero/u, "this mod must not be silenced by the neighbour");
       const value = /NODE_OPTIONS=\[(.*)\]/u.exec(result.stdout);
       assert.ok(value, `NODE_OPTIONS must be reported:\n${result.stdout}`);
       assert.ok(
@@ -329,7 +329,7 @@ function register(harness) {
   });
 
   test("installer: end to end install, reinstall, and uninstall", () => {
-    const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "beta-autopilotjumpzero-"));
+    const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "autopilotjumpzero-"));
     try {
       const root = buildFixtureRoot(workdir);
       const entrypoint = path.join(root, "docker", "entrypoint.sh");
@@ -365,7 +365,7 @@ function register(harness) {
         "server/package.json must stay untouched: it is a Docker dependency-layer input",
       );
       assert.match(installOutput, /docker \+ native/u, "both deployments must be detected");
-      assert.strictEqual(fs.readdirSync(path.join(root, "_beta-autopilotjumpzero-backup")).length, 1, "one backup per run");
+      assert.strictEqual(fs.readdirSync(path.join(root, "_autopilotjumpzero-backup")).length, 1, "one backup per run");
 
       const afterFirst = { entrypoint: read(entrypoint), startServer: read(startServer) };
       run("install.js", []);

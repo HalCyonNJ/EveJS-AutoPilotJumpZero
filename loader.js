@@ -5,12 +5,12 @@ const Module = require("node:module");
 const path = require("node:path");
 const { isMainThread } = require("node:worker_threads");
 
-const MOD_VERSION = "1.1.2-beta.1";
+const MOD_VERSION = "1.1.2";
 const MOD_DIR = __dirname;
 const RUNTIME_ROOT = path.resolve(MOD_DIR, "../..");
-const LOG_PREFIX = "[beta-autopilotJumpZero]";
-const INSTALL_FLAG = "__betaAutopilotJumpZeroLoaderInstalled";
-const API_SYMBOL = "evejs.betaAutopilotJumpZero";
+const LOG_PREFIX = "[autopilotJumpZero]";
+const INSTALL_FLAG = "__autopilotJumpZeroLoaderInstalled";
+const API_SYMBOL = "evejs.autopilotJumpZero";
 
 function log(message) {
   console.log(`${LOG_PREFIX} ${message}`);

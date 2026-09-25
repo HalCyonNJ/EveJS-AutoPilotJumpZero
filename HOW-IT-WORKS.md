@@ -7,7 +7,7 @@
 > reader can jump straight to the code.
 
 **Target:** EveJS 0.12.9 (`beyonceService.js`, build shipped with SDE 3396210)
-**Mod version:** 1.1.2-beta.1 · **Manifest kind:** `loader` · **Backends:** native (Docker is registered separately, see §8)
+**Mod version:** 1.1.2 · **Manifest kind:** `loader` · **Backends:** native (Docker is registered separately, see §8)
 **Runtime requirement:** Node.js 18+ (the installer needs it on `PATH` too)
 
 ---
@@ -111,7 +111,7 @@ Exactly one line changes, in `server/src/services/ship/beyonceService.js`:
 const result = spaceRuntime.warpToEntity(session, targetID, { minimumRange: 10000 });
 
 // as seen by the running server with this mod installed (one source line)
-const result = spaceRuntime.warpToEntity(session, targetID, { minimumRange: globalThis[Symbol.for("evejs.betaAutopilotJumpZero")]?.warpInDistanceMeters ?? 0 }); /* beta-autopilotJumpZero: autopilot warp-in distance */
+const result = spaceRuntime.warpToEntity(session, targetID, { minimumRange: globalThis[Symbol.for("evejs.autopilotJumpZero")]?.warpInDistanceMeters ?? 0 }); /* autopilotJumpZero: autopilot warp-in distance */
 ```
 
 That is the complete gameplay change. Nothing else in the file, and no other
@@ -124,7 +124,7 @@ Three reasons, all deliberate:
 - **The value stays configurable at runtime** without re-transforming anything:
   the running line reads whatever the loader published at startup, so the
   distance can be retuned (§6) without touching the transform.
-- **`Symbol.for("evejs.betaAutopilotJumpZero")` is a registry symbol**, so any other
+- **`Symbol.for("evejs.autopilotJumpZero")` is a registry symbol**, so any other
   server-side code can find the mod's API without `require`-ing the mod or
   depending on its path - and the mod can be dropped into any load order.
 - **`?? 0` is a fail-safe default, not an accident.** If the API is missing (for
@@ -138,7 +138,7 @@ Three reasons, all deliberate:
 The transformed line ends with:
 
 ```js
-/* beta-autopilotJumpZero: autopilot warp-in distance */
+/* autopilotJumpZero: autopilot warp-in distance */
 ```
 
 That marker is how the mod recognises **its own** work later (§4.2): a file that
@@ -158,24 +158,24 @@ no `require` inside EveJS is edited.
 
 ```text
 # Docker (docker/entrypoint.sh, both run_server() and run_all())
-    --require /app/mods/beta-autopilotJumpZero/loader.js \
+    --require /app/mods/autopilotJumpZero/loader.js \
 
 # Native (StartServer.bat, inherited by both npm start branches)
 # appended to the list, keeping whatever another loader mod put there
-NODE_OPTIONS=<existing> --require "<root>/mods/beta-autopilotJumpZero/loader.js"
+NODE_OPTIONS=<existing> --require "<root>/mods/autopilotJumpZero/loader.js"
 
 # Native, manual
-node --require ../mods/beta-autopilotJumpZero/loader.js .
+node --require ../mods/autopilotJumpZero/loader.js .
 ```
 
 `loader.js` computes the EveJS root from its own location:
 
 ```js
-const MOD_DIR = __dirname;                              // .../mods/beta-autopilotJumpZero
+const MOD_DIR = __dirname;                              // .../mods/autopilotJumpZero
 const RUNTIME_ROOT = path.resolve(MOD_DIR, "../..");    // the EveJS root
 ```
 
-So the mod must live at `<EveJS root>/mods/beta-autopilotJumpZero/`. That is the only
+So the mod must live at `<EveJS root>/mods/autopilotJumpZero/`. That is the only
 installation requirement.
 
 ### 3.2 Step 1 - gates before anything is installed
@@ -185,7 +185,7 @@ installation requirement.
 | Gate | Condition | Result |
 |---|---|---|
 | Worker threads | `isMainThread === false` | inert, reason `worker-thread` |
-| Double install | `globalThis.__betaAutopilotJumpZeroLoaderInstalled` already set | inert, reason `already-installed` |
+| Double install | `globalThis.__autopilotJumpZeroLoaderInstalled` already set | inert, reason `already-installed` |
 | Disabled | `EVEJS_AUTOPILOT_JUMP_ZERO=0` | inert, logs "mod disabled", vanilla behaviour |
 | Bad config | any value fails validation | **no hook installed**, each problem logged |
 | Viability | the target file is not the expected shape | **no hook installed**, each failing check logged |
@@ -255,8 +255,8 @@ Two extra guards protect against ordering hazards:
 ### 3.6 Step 5 - publish the API
 
 ```js
-globalThis[Symbol.for("evejs.betaAutopilotJumpZero")] = Object.freeze({
-  version: "1.1.2-beta.1",
+globalThis[Symbol.for("evejs.autopilotJumpZero")] = Object.freeze({
+  version: "1.1.2",
   warpInDistanceMeters: 0,   // the configured value
   config,                    // the full resolved config, frozen
 });
@@ -413,9 +413,9 @@ path idempotently.
 
 | Deployment | File | Entry added | Rebuild needed? |
 |---|---|---|---|
-| Docker, separate server service (Docker Compose project) | `docker/entrypoint.sh`, `run_server()` | `--require /app/mods/beta-autopilotJumpZero/loader.js` | yes - `mods/` is baked into the image |
+| Docker, separate server service (Docker Compose project) | `docker/entrypoint.sh`, `run_server()` | `--require /app/mods/autopilotJumpZero/loader.js` | yes - `mods/` is baked into the image |
 | Docker, single-container "all" mode (the image's default `CMD ["all"]`) | `docker/entrypoint.sh`, `run_all()` | same | yes |
-| Native Windows | `StartServer.bat` | `NODE_OPTIONS=<existing> --require "<root>/mods/beta-autopilotJumpZero/loader.js"` (appended) | no |
+| Native Windows | `StartServer.bat` | `NODE_OPTIONS=<existing> --require "<root>/mods/autopilotJumpZero/loader.js"` (appended) | no |
 | EveJS Launcher | launcher mod list | enable the entry from `evejs-launcher.mod.json` | no |
 
 Three deliberate implementation details, all learned the hard way:
@@ -451,7 +451,7 @@ Three deliberate implementation details, all learned the hard way:
 Uninstall is the mirror image: `installer/uninstall.bat` removes **exactly** the entries
 the installer added (never a whole-file restore, so it cannot undo a mod that
 registered itself later), archives the mod folder to
-`<root>/_beta-autopilotjumpzero-backup/<timestamp>/`, and leaves the rest of the
+`<root>/_autopilotjumpzero-backup/<timestamp>/`, and leaves the rest of the
 checkout alone. `--keep-files` unregisters without deleting the folder.
 
 ---
@@ -500,7 +500,7 @@ acceptance run also completed without issues.
 
 ```text
 # try the retail-style crawl again (native example)
-mods\beta-autopilotJumpZero\.env ->  EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS=15000
+mods\autopilotJumpZero\.env ->  EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS=15000
 restart the server
 
 # turn the mod off entirely, keeping it installed
@@ -520,8 +520,8 @@ needed to change a *value*, only to add or remove the *mod*.
 
 | Log line | Meaning |
 |---|---|
-| `[beta-autopilotJumpZero] v1.1.2-beta.1 active - autopilot warp-in distance 0 m` | installed and enabled |
-| `[beta-autopilotJumpZero] in-memory transform applied: beyonceService autopilot warp-in distance 0 m` | the seam was actually rewritten in memory |
+| `[autopilotJumpZero] v1.1.2 active - autopilot warp-in distance 0 m` | installed and enabled |
+| `[autopilotJumpZero] in-memory transform applied: beyonceService autopilot warp-in distance 0 m` | the seam was actually rewritten in memory |
 | `... in-memory transform already present:` | the file already carried the mod's own seam |
 | `viability gate failed - no hooks installed` (+ reason lines) | the target file is not the shape the mod expects → **server runs vanilla** |
 | `the autopilot warp-in distance is already owned by a server-side patch` | another patch owns the seam → **server runs that patch's behaviour** |
@@ -539,7 +539,7 @@ for the mod being present.
 ## 13. File map
 
 ```text
-mods/beta-autopilotJumpZero/
+mods/autopilotJumpZero/
   loader.js                 entry point: gates, Module._load hook, API publication
   config.js                 env/.env/default resolution + validation
   lib/sourceTransforms.js   the seam, the anchors, the state machine

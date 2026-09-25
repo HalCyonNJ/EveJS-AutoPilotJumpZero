@@ -178,7 +178,7 @@ test("transform rewrites the vanilla seam in place", () => {
   assert.ok(result.source.includes(transforms.MARKERS.beyonceService));
   assert.ok(
     result.source.includes(
-      'globalThis[Symbol.for("evejs.betaAutopilotJumpZero")]?.warpInDistanceMeters ?? 0',
+      'globalThis[Symbol.for("evejs.autopilotJumpZero")]?.warpInDistanceMeters ?? 0',
     ),
   );
   assert.ok(!result.source.includes("minimumRange: 10000"));

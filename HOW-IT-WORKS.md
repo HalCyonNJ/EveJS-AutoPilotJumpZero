@@ -45,7 +45,8 @@ independent things:
 2. **It decides on its own when to jump or dock.** Once the *surface* distance
    from the ship to the target drops far enough, the autopilot issues its own
    `CmdStargateJump` (gate) or `CmdDock` (station). Those thresholds are client
-   constants - roughly 2.5 km for both - and the server does not read them.
+   constants - roughly 2.5 km for a gate and 50 km for a station - and the
+   server does not read them.
 
 Because of (1), the effective autopilot range is 100% server-side. Because of
 (2), the server cannot fix the pacing by making the jump range larger: the client
@@ -87,7 +88,7 @@ travel time. This mod pulls that lever.
 ```
 
 `10000` is a literal. There is no config key, no environment variable and no
-constant for it anywhere else in 0.12.9 - this call site is the whole story.
+server-side constant for it anywhere else in 0.12.9 - this call site is the whole story.
 
 ### 1.4 The consequence in game
 
@@ -160,7 +161,7 @@ no `require` inside EveJS is edited.
 # Docker (docker/entrypoint.sh, both run_server() and run_all())
     --require /app/mods/autopilotJumpZero/loader.js \
 
-# Native (StartServer.bat, inherited by both npm start branches)
+# Native (StartServer.bat, once the installer has added its preload block)
 # appended to the list, keeping whatever another loader mod put there
 NODE_OPTIONS=<existing> --require "<root>/mods/autopilotJumpZero/loader.js"
 
@@ -393,7 +394,7 @@ flowchart LR
   C --> D["Ship lands X metres from the target surface"]
   D --> E{"Client re-checks its own<br/>surface distance each tick"}
   E -->|"under ~2500 m, target is a gate"| F["CmdStargateJump"]
-  E -->|"under ~2500 m, target is a station"| G["CmdDock"]
+  E -->|"under ~50 km, target is a station"| G["CmdDock"]
   E -->|"still too far"| H["Approach leg at sub-warp speed<br/>(the slow part)"]
 ```
 
@@ -415,7 +416,7 @@ path idempotently.
 |---|---|---|---|
 | Docker, separate server service (Docker Compose project) | `docker/entrypoint.sh`, `run_server()` | `--require /app/mods/autopilotJumpZero/loader.js` | yes - `mods/` is baked into the image |
 | Docker, single-container "all" mode (the image's default `CMD ["all"]`) | `docker/entrypoint.sh`, `run_all()` | same | yes |
-| Native Windows | `StartServer.bat` | `NODE_OPTIONS=<existing> --require "<root>/mods/autopilotJumpZero/loader.js"` (appended) | no |
+| Native Windows | `StartServer.bat`, once the installer adds the block (this checkout's launcher has none) | `NODE_OPTIONS=<existing> --require "<root>/mods/autopilotJumpZero/loader.js"` (appended) | no |
 | EveJS Launcher | launcher mod list | enable the entry from `evejs-launcher.mod.json` | no |
 
 Three deliberate implementation details, all learned the hard way:

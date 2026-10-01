@@ -32,7 +32,7 @@ to be read by a person or fed to an AI, so the mod can be understood and changed
 The retail client autopilot (`eve/client/script/parklife/autopilot.py`) does two separate things:
 
 - it asks the server to warp with `michelle.GetRemotePark().CmdWarpToStuffAutopilot(destinationID)` - a bare target, no range - so the landing point is entirely the server's decision;
-- it decides on its own to jump once the **surface** distance to the gate drops under `const.maxStargateJumpingDistance` (2500 m), and to dock once the surface distance to a station drops under `const.maxDockingDistance` (2500 m).
+- it decides on its own to jump once the **surface** distance to the gate drops under `const.maxStargateJumpingDistance` (2500 m), and to dock once the surface distance to a station drops under `const.maxDockingDistance` (50000 m).
 
 EveJS 0.12.9 hardcodes that autopilot landing to `{ minimumRange: 10000 }` in `Handle_CmdWarpToStuffAutopilot`. Landing 10 km from the gate puts the ship outside the jump bubble, so the autopilot has to burn an extra approach leg before it can jump - the slow part of travelling.
 
@@ -80,7 +80,7 @@ every deployment it finds:
 | Deployment | Registered in | Entry added |
 |---|---|---|
 | Docker | `docker/entrypoint.sh`, in both `run_server()` and `run_all()` | `--require /app/mods/autopilotJumpZero/loader.js` |
-| Native | `StartServer.bat`, whose `NODE_OPTIONS` both `npm start` branches inherit | `NODE_OPTIONS=<existing> --require "…\mods\autopilotJumpZero\loader.js"` (appended) |
+| Native | `StartServer.bat`, once the installer adds the block (this checkout's launcher has none) | `NODE_OPTIONS=<existing> --require "…\mods\autopilotJumpZero\loader.js"` (appended) |
 
 Both registrations are idempotent, and every file the installer rewrites is
 copied to `<EveJS root>\_autopilotjumpzero-backup\<timestamp>\` first. The

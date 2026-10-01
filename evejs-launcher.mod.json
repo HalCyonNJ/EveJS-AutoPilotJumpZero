@@ -6,7 +6,8 @@
   "description": "Autopilot warps land on the target, so stargate jumps fire the moment the warp ends instead of after an approach leg.",
   "kind": "loader",
   "supportedBackends": [
-    "native"
+    "native",
+    "docker"
   ],
   "activation": {
     "strategy": "loader_rename"

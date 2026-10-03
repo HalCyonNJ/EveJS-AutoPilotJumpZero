@@ -98,18 +98,33 @@ Docker : docker compose build && docker compose up -d --no-deps server
 Native : restart the server with StartServer.bat
 ```
 
-### EveJS Launcher (native)
+### EveJS Launcher (third-party)
 
-No separate mod ZIP is published - build one from this folder for the launcher:
+The third-party **EveJS Launcher** installs a mod from a ZIP, and this folder is already
+the package it wants: `evejs-launcher.mod.json` sits beside `loader.js`, and the archive
+built by `tools\BuildPackage.bat` has `autopilotJumpZero\` as its single top-level folder.
 
-1. Zip this folder so `autopilotJumpZero\` is the archive root and
-   `evejs-launcher.mod.json` sits inside it, beside `loader.js`.
-2. Open **Mods** in EveJS Launcher and click **Add ZIP**.
-3. Import it and turn on the toggle beside **Autopilot Jump Zero**.
-4. Restart Game.
+1. **Mods > Add ZIP**, and pick the ZIP from the release page - or the local
+   `dist\autopilotJumpZero-<version>.zip`. (GitHub's own `Source code (zip)` unpacks as
+   `EveJS-AutoPilotJumpZero-<version>\`; rename that folder to `autopilotJumpZero` if you
+   use it instead.)
+2. Turn on the toggle beside **Autopilot Jump Zero**.
+3. There is no Configure panel: the manifest declares no `settings` block, so the mod is
+   configured through its environment variables or the `.env` beside `loader.js` (see
+   Configuration).
+4. Restart the game server when the launcher asks. A Docker deployment still needs
+   `docker compose build && docker compose up -d --no-deps server`, because `mods/` is
+   baked into the image; a native one is a restart with `StartServer.bat`.
 
-Keep the folder inside the ZIP named `autopilotJumpZero`. The manifest describes
-the launcher integration only; Docker is handled by `docker/entrypoint.sh`.
+The manifest declares `kind: "loader"` and `activation.strategy: "loader_rename"`, and this
+mod is server-side only: no client component, no login handshake and no vendor patch step,
+so the launcher has no client half to prepare and a disable or a remove has nothing outside
+`mods\autopilotJumpZero\` to undo.
+
+**Implemented, not verified:** no EveJS Launcher is available on the machine this mod is
+developed on, so this install path has **not been tested by the authors**. Treat it as
+unverified - if anything looks wrong, fall back to `installer\install.bat` for a Windows
+native install or to the Docker rebuild above.
 
 ### Manual
 
@@ -130,7 +145,7 @@ NODE_OPTIONS=<existing> --require <evejs>/mods/autopilotJumpZero/loader.js
     --require /app/mods/autopilotJumpZero/loader.js \
 ```
 
-3. Restart the server. A `[autopilotJumpZero] v1.1.2 active — autopilot warp-in distance 0 m` line confirms it.
+3. Restart the server. A `[autopilotJumpZero] v1.1.3 active — autopilot warp-in distance 0 m` line confirms it.
 
 No client update is required and none is produced.
 

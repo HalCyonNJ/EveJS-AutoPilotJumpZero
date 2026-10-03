@@ -1,4 +1,4 @@
-# Autopilot Jump Zero v1.1.2 - Installer
+# Autopilot Jump Zero v1.1.3 - Installer
 
 Makes the EveJS autopilot warp to the target itself instead of stopping about
 10 km short, so a stargate jump fires the moment the warp ends and a station
@@ -113,7 +113,7 @@ docker compose up -d --no-deps server
 The server prints one line per launch:
 
 ```text
-[autopilotJumpZero] v1.1.2 active - autopilot warp-in distance 0 m
+[autopilotJumpZero] v1.1.3 active - autopilot warp-in distance 0 m
 [autopilotJumpZero] in-memory transform applied: beyonceService autopilot warp-in distance 0 m
 ```
 

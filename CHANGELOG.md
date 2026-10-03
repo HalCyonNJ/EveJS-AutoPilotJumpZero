@@ -8,6 +8,24 @@ game client installs anything, and an existing `.env` is never overwritten.
 
 ---
 
+## 1.1.3 - 2026-10-03
+
+**The third installation path is documented, and it says plainly that it is not tested.**
+
+- **The third-party EveJS Launcher is now documented beside the native Windows installer and
+  Docker.** `README.md` covers `Mods > Add ZIP` with the release ZIP, enabling the entry, the
+  restart of the game server, and how to disable or remove the mod; `HOW-IT-WORKS.md` §8 describes
+  what the manifest declares (`kind: "loader"`, `activation.strategy: "loader_rename"`,
+  `supportedBackends: ["native", "docker"]`) and that there is no client half and no settings panel.
+- **The same honest caveat appears in both documents:** the launcher path is **implemented but has
+  not been tested by the authors**, because no EveJS Launcher is available on the machine this mod is
+  developed on, so it is unverified and the native or Docker install is the fallback.
+- No code, configuration or gameplay changes: the autopilot still warps to the target surface by
+  default, and every other warp path is untouched.
+- Verified with the development suite at **28/28 PASS**.
+
+---
+
 ## 1.1.2 - 2026-09-25
 
 **EveJS 0.12.9 release.**

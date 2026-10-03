@@ -7,7 +7,7 @@
 > reader can jump straight to the code.
 
 **Target:** EveJS 0.12.9 (`beyonceService.js`, build shipped with SDE 3396210)
-**Mod version:** 1.1.2 · **Manifest kind:** `loader` · **Backends:** native (Docker is registered separately, see §8)
+**Mod version:** 1.1.3 · **Manifest kind:** `loader` · **Backends:** native (Docker is registered separately, see §8)
 **Runtime requirement:** Node.js 18+ (the installer needs it on `PATH` too)
 
 ---
@@ -257,7 +257,7 @@ Two extra guards protect against ordering hazards:
 
 ```js
 globalThis[Symbol.for("evejs.autopilotJumpZero")] = Object.freeze({
-  version: "1.1.2",
+  version: "1.1.3",
   warpInDistanceMeters: 0,   // the configured value
   config,                    // the full resolved config, frozen
 });
@@ -417,7 +417,18 @@ path idempotently.
 | Docker, separate server service (Docker Compose project) | `docker/entrypoint.sh`, `run_server()` | `--require /app/mods/autopilotJumpZero/loader.js` | yes - `mods/` is baked into the image |
 | Docker, single-container "all" mode (the image's default `CMD ["all"]`) | `docker/entrypoint.sh`, `run_all()` | same | yes |
 | Native Windows | `StartServer.bat`, once the installer adds the block (this checkout's launcher has none) | `NODE_OPTIONS=<existing> --require "<root>/mods/autopilotJumpZero/loader.js"` (appended) | no |
-| EveJS Launcher | launcher mod list | enable the entry from `evejs-launcher.mod.json` | no |
+| EveJS Launcher (third-party) | `Mods > Add ZIP` in the launcher, then its mod list | enable the entry `evejs-launcher.mod.json` declares (`kind: "loader"`, `activation.strategy: "loader_rename"`) | Docker yes, native no |
+
+That last row is a **manifest** registration rather than a file the installer edits.
+`evejs-launcher.mod.json` declares `schemaVersion: 3`, `"kind": "loader"`,
+`"activation": { "strategy": "loader_rename" }`, `supportedBackends: ["native", "docker"]`,
+`compatibility.evejsVersions: ["0.12.9"]` and `restart: "game_server"`; the launcher enables
+the entry by renaming the loader payload rather than by patching anything, which is all this
+mod needs because it is server-side only - there is no client component, no login handshake
+and no vendor file to patch. The manifest declares no `settings` block, so the launcher's
+Configure panel has nothing to offer this mod. **The launcher path is implemented but
+untested by us**: no EveJS Launcher exists on the machine this mod is developed on, so treat
+it as unverified and fall back to the native or Docker install if anything looks wrong.
 
 Three deliberate implementation details, all learned the hard way:
 
@@ -521,7 +532,7 @@ needed to change a *value*, only to add or remove the *mod*.
 
 | Log line | Meaning |
 |---|---|
-| `[autopilotJumpZero] v1.1.2 active - autopilot warp-in distance 0 m` | installed and enabled |
+| `[autopilotJumpZero] v1.1.3 active - autopilot warp-in distance 0 m` | installed and enabled |
 | `[autopilotJumpZero] in-memory transform applied: beyonceService autopilot warp-in distance 0 m` | the seam was actually rewritten in memory |
 | `... in-memory transform already present:` | the file already carried the mod's own seam |
 | `viability gate failed - no hooks installed` (+ reason lines) | the target file is not the shape the mod expects → **server runs vanilla** |

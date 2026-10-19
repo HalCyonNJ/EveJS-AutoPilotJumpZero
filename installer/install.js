@@ -4,7 +4,7 @@
  * Autopilot Jump Zero - installer.
  *
  * The mod itself never edits EveJS source on disk; it is a loader that
- * transforms one file in memory. What has to be registered is the preload
+ * transforms two files in memory. What has to be registered is the preload
  * itself, and each deployment offers a different place to do it:
  *
  *   Docker  docker/entrypoint.sh   --require /app/mods/autopilotJumpZero/loader.js
@@ -17,10 +17,10 @@
  * loader mods instead of racing them for the variable.
  *
  * Usage:
- *   node install.js --server "D:\eve\v0.12.9"
- *   node install.js --server "D:\eve\v0.12.9" --dry-run
- *   node install.js --server "D:\eve\v0.12.9" --docker-only
- *   node install.js --status --server "D:\eve\v0.12.9"
+ *   node install.js --server "D:\eve\v261018.1"
+ *   node install.js --server "D:\eve\v261018.1" --dry-run
+ *   node install.js --server "D:\eve\v261018.1" --docker-only
+ *   node install.js --status --server "D:\eve\v261018.1"
  */
 
 const fs = require("node:fs");
@@ -126,7 +126,7 @@ function resolveRoot(options) {
   if (explicit) {
     const resolved = path.resolve(explicit);
     if (!deployment.isEveJsRoot(resolved)) {
-      fail(`${resolved} does not look like an EveJS 0.12.9 root (server/index.js and beyonceService.js must exist)`);
+      fail(`${resolved} does not look like an EveJS root (server/index.js and server/src/services/ship/beyonceService.js must exist)`);
     }
     return resolved;
   }
@@ -154,9 +154,6 @@ function copyPayload(source, target) {
   }
   for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
     if (COPY_EXCLUDES.has(entry.name) || COPY_EXCLUDED_FILES.has(entry.name)) continue;
-    // A local .env is the operator's configuration; never overwrite it on
-    // reinstall. Delete it first if the shipped defaults are wanted.
-    if (entry.name === ".env" && fs.existsSync(path.join(target, ".env"))) continue;
     const from = path.join(source, entry.name);
     const to = path.join(target, entry.name);
     if (entry.isDirectory()) copyPayload(from, to);
@@ -199,6 +196,11 @@ function reportStatus(root, payload, deployments) {
     const text = deployment.readText(deployments.docker.entrypoint);
     const registered = register.hasEntrypointPreload(text, { requirePath: register.containerRequirePath(deployment.MOD_ID) });
     out(`Docker     : ${registered ? "registered" : "NOT registered"} (${deployments.docker.entrypoint})`);
+    const ignoreFile = deployments.docker.dockerignore;
+    if (deployment.isFile(ignoreFile)) {
+      const allowlisted = register.hasDockerignoreAllowlist(deployment.readText(ignoreFile));
+      out(`Build ctx  : ${allowlisted ? "mods/ included" : "mods/ EXCLUDED - re-run the installer"} (${ignoreFile})`);
+    }
   }
   if (deployments.native.present) {
     const text = deployment.readText(deployments.native.startServerBat);
@@ -283,6 +285,26 @@ function main() {
     });
   }
 
+  // 2b. Docker: the build context has to carry mods/ as well. 261018.1's
+  // .dockerignore is `**` plus an allowlist that does not mention mods/, and the
+  // image is built with `COPY . .`, so without this the preloaded path above
+  // would point at a file the image never received.
+  if (useDocker && deployment.isFile(deployments.docker.dockerignore)) {
+    const file = deployments.docker.dockerignore;
+    const result = register.applyDockerignoreAllowlist(deployment.readText(file));
+    if (!result.ok) {
+      out(`[WARN] ${deployment.DOCKERIGNORE}: ${result.reason}`);
+    } else if (!result.changed) {
+      out(`[SKIP] ${deployment.DOCKERIGNORE}: ${result.reason}`);
+    } else if (options.dryRun) {
+      out(`[PLAN] ${deployment.DOCKERIGNORE}: would add !mods/ and !mods/** so the image includes the payload`);
+    } else {
+      archiveOnce(file);
+      deployment.writeText(file, result.text);
+      out(`[ OK ] ${deployment.DOCKERIGNORE}: added !mods/ and !mods/** so the image includes the payload`);
+    }
+  }
+
   // 3. Native: preload the loader from the Windows launcher.
   if (useNative) {
     const file = deployments.native.startServerBat;
@@ -321,10 +343,10 @@ function main() {
   out(`  Confirm a boot line: [autopilotJumpZero] v${payload.version} active`);
   out("");
   out("  Configuration");
-  out("    Native : mods/autopilotJumpZero/.env (EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS)");
-  out("    Docker : .env is excluded from the image; add the same keys to the");
-  out("             server service `environment:` in compose.yaml.");
-  out("             The shipped defaults (enabled, 0 m) need no configuration.");
+  out("    There is no configuration file. The shipped defaults need none.");
+  out("    Optional, as environment variables on the server:");
+  out("      EVEJS_AUTOPILOT_JUMP_ZERO_SURFACE_CLEARANCE_METERS  (0-2000, default 500)");
+  out("      EVEJS_AUTOPILOT_JUMP_ZERO                           (0 disables the mod)");
 }
 
 try {

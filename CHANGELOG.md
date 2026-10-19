@@ -1,10 +1,43 @@
 # Changelog
 
-Autopilot Jump Zero for EveJS 0.12.9. Newest release first.
+Autopilot Jump Zero for EveJS 261018.1. Newest release first.
 
 Every release is a drop-in replacement for the one before it: put the folder at
 `mods\autopilotJumpZero` and run `installer\install.bat`. No vendor file is edited on disk, no
 game client installs anything, and an existing `.env` is never overwritten.
+
+---
+
+## 1.2.0 - 2026-10-20
+
+**Capitals no longer land inside a stargate, and the mod targets EveJS 261018.1.**
+
+- **The stargate landing is now sized to the hull.** EveJS builds a stargate warp's exit point as
+  *gate radius + requested surface range* and never adds the ship's own radius, so a "warp to 0"
+  put the hull's **centre on the gate's surface**. A frigate (31 m) did not notice; a carrier
+  (1.6 km) and a titan (7.5 km) arrived with most of the hull inside the gate's collision volume
+  and the client threw them clear. The mod now transforms the one function that produces that
+  point (`server/src/space/destiny/simulation/warpTargets.js`, `getStargateWarpExitEnvelopePoint`)
+  and adds the ship's radius plus a clearance capped at that radius. Measured against the live
+  261018.1 file: a titan lands 0.5 km from the gate surface instead of 7.5 km inside it, a
+  battleship 250 m, a frigate 31 m.
+- **New setting `EVEJS_AUTOPILOT_JUMP_ZERO_SURFACE_CLEARANCE_METERS`** (default `500`, range
+  `0`-`2000`) tunes that clearance. It is capped at the ship's own radius, so small hulls keep
+  their old landing and only hulls that are actually big gain the offset.
+- **The old distance knob and the `.env` file are gone.** `EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS`
+  existed to fine-tune the landing point, which the hull-sized geometry now owns: the autopilot
+  distance is a literal `0` in the transform, and there is no configuration file to copy or edit.
+  The mod reads environment variables only, and the shipped defaults need none.
+- **Both seams fail closed.** The second transform has the same three states as the first
+  (`vanilla` / `installed` / `foreign`) and the same line-count invariant, and the viability gate
+  now also checks the envelope function before any hook is installed. A server that already adds
+  the ship radius is reported as owning the geometry instead of being patched twice.
+- **Re-anchored against EveJS 261018.1**: manifest `compatibility.evejsVersions` is
+  `["261018.1"]`, the installer no longer names a version in its error message, and the docs refer
+  to the current build.
+- Verified with the development suite at **36/36 PASS**, including the arithmetic check against the
+  live `warpTargets.js` (both seam states probed read `vanilla`), and **accepted in game on a live
+  261018.1 server by a titan and a freighter**: both jump on arrival with no collision bounce.
 
 ---
 

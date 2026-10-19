@@ -286,17 +286,71 @@ function startServerPreloadIsCurrent(text, options) {
   return blockMatches(lines, existing, block);
 }
 
+// --- Docker build context ---------------------------------------------------
+//
+// 261018.1 ships `.dockerignore` as `**` followed by an allowlist, and `mods/`
+// is not on it. The image is built with `COPY . .`, so without these two lines
+// the payload never reaches /app/mods even though entrypoint.sh preloads it -
+// the container then dies with "Cannot find module". These are the same two
+// lines the 0.12.9 tree carried.
+const DOCKERIGNORE_MODS_ALLOWLIST = Object.freeze(["!mods/", "!mods/**"]);
+const DOCKERIGNORE_ALLOWLIST_LINES = Object.freeze([
+  "# Loader mods are baked into the runtime image. Unlike config/, they are not",
+  "# bind-mounted, so any change under mods/ needs an image rebuild.",
+  ...DOCKERIGNORE_MODS_ALLOWLIST,
+]);
+
+function dockerignoreLines(text) {
+  return splitLines(text).map((line) => stripCarriageReturn(line).trim());
+}
+
+function hasDockerignoreAllowlist(text) {
+  const lines = dockerignoreLines(text);
+  return DOCKERIGNORE_MODS_ALLOWLIST.every((entry) => lines.includes(entry));
+}
+
+// Only the `**` + allowlist form excludes mods/ in the first place. A plain
+// ignore list (or no file at all) already sends mods/ into the build context,
+// so patching it would be noise.
+function dockerignoreIsAllowlist(text) {
+  return dockerignoreLines(text).includes("**");
+}
+
+function applyDockerignoreAllowlist(text) {
+  const source = String(text);
+  if (hasDockerignoreAllowlist(source)) {
+    return { ok: true, changed: false, text: source, reason: "mods/ is already in the build context" };
+  }
+  if (!dockerignoreIsAllowlist(source)) {
+    return {
+      ok: true,
+      changed: false,
+      text: source,
+      reason: "no `**` allowlist, so mods/ is already in the build context",
+    };
+  }
+  const lines = splitLines(source);
+  const at = lines.findIndex((line) => stripCarriageReturn(line).trim().startsWith("**/node_modules"));
+  const index = at >= 0 ? at : lines.length;
+  const insertion = [...DOCKERIGNORE_ALLOWLIST_LINES];
+  const output = [...lines.slice(0, index), ...insertion, ...lines.slice(index)];
+  return { ok: true, changed: true, text: output.join("\n"), insertions: insertion.length };
+}
+
 module.exports = {
   CONTAINER_MODS_ROOT,
+  DOCKERIGNORE_MODS_ALLOWLIST,
   NATIVE_MODS_PREFIX,
   SERVER_LAUNCH_FLAG,
   START_SERVER_ANCHOR,
   START_SERVER_BEGIN,
   START_SERVER_END,
+  applyDockerignoreAllowlist,
   applyEntrypointPreload,
   applyStartServerPreload,
   containerRequirePath,
   describeEntrypointPreloads,
+  hasDockerignoreAllowlist,
   hasEntrypointPreload,
   hasStartServerPreload,
   nativeExistPath,

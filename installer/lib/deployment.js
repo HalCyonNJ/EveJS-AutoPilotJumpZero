@@ -20,8 +20,16 @@ const REQUIRED_FILES = Object.freeze([
 // The installer prunes these from an already-installed folder, so an installed
 // mods\autopilotJumpZero holds the payload and nothing else.
 const DEV_ONLY_DIRECTORIES = Object.freeze(["installer", "node_modules", ".git"]);
-const DEV_ONLY_FILES = Object.freeze([]);
+// ANNOUNCEMENT.md is the paste buffer for the release note and lives on the
+// author's machine only; copyPayload also prunes it out of a target it refreshes.
+// `.env` / `.env.example` are the configuration files 1.2.0 retired: nothing reads
+// them any more, and a payload upgraded from 1.1.x may still carry them.
+const DEV_ONLY_FILES = Object.freeze(["ANNOUNCEMENT.md", ".env", ".env.example"]);
 const DOCKER_ENTRYPOINT = path.join("docker", "entrypoint.sh");
+// The Docker build context. 261018.1 ships it as `**` + an allowlist that does
+// not mention mods/, so the installer has to add those two lines or the image
+// never contains the payload.
+const DOCKERIGNORE = ".dockerignore";
 // The native entry point. Deliberately not server/package.json: that file is
 // an input to the image's dependency layer, so editing it forces npm ci to
 // re-run on the next Docker build.
@@ -126,9 +134,10 @@ function findDeeperEveJsRoots(startDirs, levels = 4) {
 
 function detectDeployments(root) {
   const entrypoint = path.join(root, DOCKER_ENTRYPOINT);
+  const dockerignore = path.join(root, DOCKERIGNORE);
   const startServerBat = path.join(root, NATIVE_START_SERVER);
   return {
-    docker: { name: "docker", entrypoint, present: isFile(entrypoint) },
+    docker: { name: "docker", entrypoint, dockerignore, present: isFile(entrypoint) },
     native: { name: "native", startServerBat, present: isFile(startServerBat) },
   };
 }
@@ -184,6 +193,7 @@ module.exports = {
   BACKUP_DIRNAME,
   DEV_ONLY_DIRECTORIES,
   DEV_ONLY_FILES,
+  DOCKERIGNORE,
   DOCKER_ENTRYPOINT,
   MOD_ID,
   NATIVE_START_SERVER,

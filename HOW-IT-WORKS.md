@@ -6,8 +6,8 @@
 > function names and the exact strings the mod matches on are all quoted, so a
 > reader can jump straight to the code.
 
-**Target:** EveJS 0.12.9 (`beyonceService.js`, build shipped with SDE 3396210)
-**Mod version:** 1.1.3 · **Manifest kind:** `loader` · **Backends:** native (Docker is registered separately, see §8)
+**Target:** EveJS 261018.1 (`beyonceService.js` and `warpTargets.js`, build shipped with SDE 3396210)
+**Mod version:** 1.2.0 · **Manifest kind:** `loader` · **Backends:** native and Docker (both registered by the installer, see §8)
 **Runtime requirement:** Node.js 18+ (the installer needs it on `PATH` too)
 
 ---
@@ -23,11 +23,14 @@ feel slow.
 
 This mod rewrites that one number to **0**, *in memory, while the server is
 starting*. Autopilot warps then land on the target: a stargate jump goes out the
-moment the warp ends, and a station destination docks on arrival.
+moment the warp ends, and a station destination docks on arrival. It also makes
+the stargate exit point recognise the ship's own size, because "on the gate" as
+the server computes it means the hull's **centre** on the gate's surface - fine
+for a frigate, a collision bounce for a titan.
 
 - No file on disk is modified - not EveJS, not the mod's own copy of it.
 - No game client change - **there is nothing to install on the game client**.
-- One setting, and it fails closed rather than guessing (§5).
+- One optional setting and no configuration file, and it fails closed rather than guessing (§5).
 
 ---
 
@@ -88,14 +91,14 @@ travel time. This mod pulls that lever.
 ```
 
 `10000` is a literal. There is no config key, no environment variable and no
-server-side constant for it anywhere else in 0.12.9 - this call site is the whole story.
+server-side constant for it anywhere else in 261018.1 - this call site is the whole story.
 
 ### 1.4 The consequence in game
 
-| Leg | Vanilla 0.12.9 | With this mod (default `0`) |
+| Leg | Vanilla 261018.1 | With this mod (default `0`, clearance `500`) |
 |---|---|---|
-| Warp to gate | warp ends 10,000 m from the gate | warp ends on the gate |
-| Approach leg | ~7,500 m at sub-warp speed | none |
+| Warp to gate | warp ends 10,000 m from the gate | warp ends just outside the gate - the hull's radius plus the clearance |
+| Approach leg | ~7,500 m at sub-warp speed | none for a frigate; none to a short hop for a capital |
 | Jump | after the approach leg | as the warp ends |
 | Warp to station | warp ends 10,000 m out, then an approach, then dock | warp ends inside docking range, docks on arrival |
 
@@ -103,48 +106,100 @@ server-side constant for it anywhere else in 0.12.9 - this call site is the whol
 
 ## 2. The change
 
-### 2.1 The seam, before and after
+### 2.1 The first seam: the autopilot landing
 
-Exactly one line changes, in `server/src/services/ship/beyonceService.js`:
+Exactly one line changes in that handler, in `server/src/services/ship/beyonceService.js`:
 
 ```js
-// vanilla 0.12.9
+// vanilla 261018.1
 const result = spaceRuntime.warpToEntity(session, targetID, { minimumRange: 10000 });
 
 // as seen by the running server with this mod installed (one source line)
 const result = spaceRuntime.warpToEntity(session, targetID, { minimumRange: globalThis[Symbol.for("evejs.autopilotJumpZero")]?.warpInDistanceMeters ?? 0 }); /* autopilotJumpZero: autopilot warp-in distance */
 ```
 
-That is the complete gameplay change. Nothing else in the file, and no other
-file, is transformed or patched.
+That is the autopilot half of the change. It moves the landing in; it does not say
+anything about the *shape* of the ship that lands, which is what the second seam is
+for.
 
-### 2.2 Why a `globalThis[Symbol.for(...)]` lookup instead of a literal `0`
+### 2.1.1 The second seam: the stargate landing geometry
 
-Three reasons, all deliberate:
+One more line changes, in `server/src/space/destiny/simulation/warpTargets.js`, inside
+`getStargateWarpExitEnvelopePoint` - the single function that turns "warp to a stargate"
+into an exit point:
 
-- **The value stays configurable at runtime** without re-transforming anything:
-  the running line reads whatever the loader published at startup, so the
-  distance can be retuned (§6) without touching the transform.
+```js
+// vanilla 261018.1
+scaleVector(fromGateToShip, gateRadius + explicitSurfaceRange),
+
+// with the mod installed
+scaleVector(fromGateToShip, gateRadius + explicitSurfaceRange + (globalThis[Symbol.for("evejs.autopilotJumpZero")]?.stargateSurfaceOffset?.(entity) ?? 0)), /* autopilotJumpZero: stargate surface offset */
+```
+
+**Why it is needed.** Vanilla computes the exit distance from the gate alone. With the
+autopilot distance at `0` the requested surface range is `0`, so the exit point is
+exactly `gateRadius` from the gate's centre: the hull's *centre* lands on the gate's
+surface. The surface distance the client uses is `centre - gateRadius - shipRadius`,
+which is therefore **negative by the ship's own radius** - the hull is inside the gate:
+
+| Ship | radius | vanilla surface distance | with the mod (clearance 500) |
+|---|---:|---:|---:|
+| frigate (Rifter) | 31 m | -31 m | 31 m |
+| battleship (Raven) | 250 m | -250 m | 250 m |
+| carrier (Archon) | 1,643 m | -1,643 m | 500 m |
+| supercarrier (Nyx) | 3,820 m | -3,820 m | 500 m |
+| titan (Erebus) | 7,500 m | -7,500 m | 500 m |
+
+A frigate's 31 m of overlap is invisible; a carrier's 1.6 km and a titan's 7.5 km are not -
+the client resolves the overlap by throwing the ship clear. That is the "bounced by the
+gate" report, and it is a geometry bug the autopilot distance alone cannot fix: a value
+at or below 2500 that would express "half a kilometre of clearance" is ignored by vanilla
+(`explicitSurfaceRange` only applies above 2500), and any value above 2500 that is small
+enough to keep the landing inside the client's jump bubble still has to be larger than
+the ship.
+
+**What the mod adds.** `stargateSurfaceOffset(entity)` returns
+`shipRadius + min(surfaceClearanceMeters, shipRadius)`: the hull's radius, so the centre
+is never inside the gate, plus a clearance that never exceeds the hull itself. A frigate
+therefore keeps a landing 31 m out, while a carrier or a titan gets the configured 500 m
+on top of its own radius. The result leaves the landing inside the client's 2500 m jump
+bubble (the vendor adds a random 0-2500 m scatter on top, so a minority of landings end
+just outside it and cost a short approach).
+
+This seam is *not* autopilot-only: every warp to a stargate uses this function, manual
+ones included, and every one of them becomes correct for large hulls. Warps to stations,
+structures, planets, belts and everything else take a different branch and are untouched.
+
+### 2.2 A literal `0` for the distance, a `globalThis[Symbol.for(...)]` lookup for the clearance
+
+The two seams differ on purpose. The autopilot distance has no reason to be tunable any
+more - the hull-sized geometry owns the landing - so it is compiled in as a literal `0`.
+The clearance *is* tunable, so its line reads the running value:
+
+- **The clearance stays configurable at runtime** without re-transforming anything:
+  the running line reads whatever the loader published at startup, so it can be
+  retuned (§6) without touching the transform.
 - **`Symbol.for("evejs.autopilotJumpZero")` is a registry symbol**, so any other
   server-side code can find the mod's API without `require`-ing the mod or
   depending on its path - and the mod can be dropped into any load order.
 - **`?? 0` is a fail-safe default, not an accident.** If the API is missing (for
   example someone applies this transform to a file but forgets the preload), the
-  code degrades to the intended "land on the target" behaviour instead of
-  silently reverting to the 10 km crawl. The mod never writes that transformed
-  text to disk anyway; it only ever exists in the compiled module.
+  envelope falls back to the vanilla distance and only the radius is added, instead
+  of throwing inside a warp. The mod never writes that transformed text to disk
+  anyway; it only ever exists in the compiled module.
 
-### 2.3 The marker comment
+### 2.3 The marker comments
 
-The transformed line ends with:
+Each transformed line ends with its own marker:
 
 ```js
 /* autopilotJumpZero: autopilot warp-in distance */
+/* autopilotJumpZero: stargate surface offset */
 ```
 
-That marker is how the mod recognises **its own** work later (§4.2): a file that
+A marker is how the mod recognises **its own** work later (§4.2): a file that
 already carries it is reported as `installed` and left alone (idempotency), and a
-marker found anywhere outside the owned handler aborts the transform instead of
+marker found anywhere outside its owned scope aborts that transform instead of
 being silently duplicated.
 
 ---
@@ -189,7 +244,7 @@ installation requirement.
 | Double install | `globalThis.__autopilotJumpZeroLoaderInstalled` already set | inert, reason `already-installed` |
 | Disabled | `EVEJS_AUTOPILOT_JUMP_ZERO=0` | inert, logs "mod disabled", vanilla behaviour |
 | Bad config | any value fails validation | **no hook installed**, each problem logged |
-| Viability | the target file is not the expected shape | **no hook installed**, each failing check logged |
+| Viability | either target file is not the expected shape | **no hook installed**, each failing check logged |
 
 Every one of these is "leave the server alone", never "try anyway".
 
@@ -223,6 +278,7 @@ identities:
 ```js
 const TARGETS = Object.freeze({
   beyonceService: "server/src/services/ship/beyonceService.js",
+  warpTargets: "server/src/space/destiny/simulation/warpTargets.js",
 });
 ```
 
@@ -257,9 +313,11 @@ Two extra guards protect against ordering hazards:
 
 ```js
 globalThis[Symbol.for("evejs.autopilotJumpZero")] = Object.freeze({
-  version: "1.1.3",
-  warpInDistanceMeters: 0,   // the configured value
-  config,                    // the full resolved config, frozen
+  version: "1.2.0",
+  warpInDistanceMeters: 0,     // the configured autopilot distance
+  surfaceClearanceMeters: 500, // the configured stargate clearance
+  stargateSurfaceOffset,       // (entity) => hull radius + capped clearance
+  config,                      // the full resolved config, frozen
 });
 ```
 
@@ -272,59 +330,60 @@ half-installed hook behind.
 
 ## 4. The transform algorithm
 
-`lib/sourceTransforms.js` owns the edit. It never uses a whole-file regex
-replace; it works on an identified region and counts tokens.
+`lib/sourceTransforms.js` owns both edits. It never uses a whole-file regex
+replace; each seam is found through its own owning function and counted.
 
-### 4.1 Finding the handler scope
+### 4.1 Finding the owned scope, twice
 
 ```js
 const HANDLER_ANCHOR = "  Handle_CmdWarpToStuffAutopilot(args, session) {";
+const ENVELOPE_ANCHOR = "  function getStargateWarpExitEnvelopePoint(";
 ```
 
-The anchor must appear **exactly once** in the file. From the anchor, the
+Each anchor must appear **exactly once** in its file. From the anchor, the
 transform takes everything up to the next `"\n  }"` - which is the closing brace
-of that member, because members of the service object are indented by two spaces.
-That gives `scope.scoped`, the only region the transform is allowed to touch.
+of that function, because the service member and the factory-local function are
+both indented by two spaces. That gives the only region the transform is allowed
+to touch: one in each file.
 
-### 4.2 The four recognised states
+### 4.2 The four recognised states, per seam
 
-Inside that scope the transform counts three tokens:
+Inside a scope the transform counts three tokens:
 
-| Token | Meaning |
-|---|---|
-| `spaceRuntime.warpToEntity(session, targetID, { minimumRange: 10000 })` | the vanilla seam |
-| the rewritten line including the marker comment | the mod's own seam |
-| `minimumRange: warpInDistanceMeters` | a *different* server-side patch already owns this |
+| Seam | Vanilla token | Owned token | Foreign token |
+|---|---|---|---|
+| autopilot landing | `spaceRuntime.warpToEntity(session, targetID, { minimumRange: 10000 })` | the rewritten line including its marker | `minimumRange: warpInDistanceMeters` |
+| stargate envelope | `scaleVector(fromGateToShip, gateRadius + explicitSurfaceRange),` | the rewritten line including its marker | `const shipRadius` inside the function |
 
-and derives a state:
+and derives a state per seam:
 
 | State | Condition | Action |
 |---|---|---|
-| `vanilla` | vanilla seam ×1, installed seam ×0, marker ×0 | **replace** the seam |
-| `installed` | vanilla ×0, installed ×1, marker ×1 | leave it, report `alreadyInstalled` |
-| `foreign` | vanilla ×0, installed ×0, and `minimumRange: warpInDistanceMeters` present | **abort** |
+| `vanilla` | vanilla token ×1, owned token ×0, marker ×0 | **replace** the seam |
+| `installed` | vanilla ×0, owned ×1, marker ×1 | leave it, report `alreadyInstalled` |
+| `foreign` | vanilla ×0, owned ×0, and the foreign token present | **abort** |
 | `missing` | anything else (0 or >1 of a token, marker outside the scope, no closing brace, no anchor) | **abort** |
 
 `foreign` is what makes this mod a good citizen: a server that already carries a
-hand-applied config-driven warp-in patch is detected and the mod stays inert
-rather than overwriting someone else's work.
+hand-applied config-driven warp-in patch, or one whose envelope already adds the
+ship radius, is detected and left alone rather than patched twice.
 
 ### 4.3 Invariants the transform enforces
 
-- **Exactly one** handler anchor, **exactly one** seam, **exactly one** marker.
-- The marker may not appear outside the owned scope.
+- **Exactly one** anchor, **exactly one** seam and **exactly one** marker **per owned function**.
+- A marker may not appear outside its owned scope.
 - **The line count must not change** (`transformSource` compares before/after and
   fails if it does) - so an edit that accidentally swallows or duplicates a line
   is rejected even if the token counts worked out.
-- Only the two-space-indented member that follows the anchor is rewritten; the
+- Only the two-space-indented function that follows the anchor is rewritten; the
   rest of the file is copied through byte for byte.
 
 ---
 
 ## 5. Failing closed: the viability gate
 
-Before installing any hook, `lib/viability.js` independently probes the target
-file for shape - deliberately using anchors that the transform itself does not
+Before installing any hook, `lib/viability.js` independently probes **both** files
+for shape - deliberately using anchors that the transforms themselves do not
 consume, so the two checks cannot both be satisfied by the same accident:
 
 ```js
@@ -336,11 +395,18 @@ const SOURCE_REQUIREMENTS = [{
     "  Handle_CmdDock(args, session) {",
     "[Beyonce] CmdWarpToStuffAutopilot char=",
   ],
+}, {
+  key: "warpTargetsShape",
+  file: "server/src/space/destiny/simulation/warpTargets.js",
+  required: [
+    "  function getStargateWarpExitEnvelopePoint(",
+    "function resolveStargateWarpTarget(",
+  ],
 }];
 ```
 
 Each token must appear exactly once. If not - wrong EveJS version, a modified or
-renamed handler, a file that is not what it claims to be - the gate fails, the
+renamed function, a file that is not what it claims to be - the gate fails, the
 mod logs `viability gate failed - no hooks installed` plus the reason, and the
 server keeps running with vanilla autopilot. **The mod never guesses and never
 partially applies.**
@@ -349,38 +415,39 @@ partially applies.**
 
 ## 6. Configuration
 
-Resolved by `config.js`, in this precedence order:
-
-1. **A real environment variable** (always wins),
-2. then `KEY=VALUE` lines from `.env` next to `loader.js` (supports `#` comments
-   and strips matched surrounding quotes),
-3. then the built-in defaults.
+There is **no configuration file** and no file source: `config.js` reads environment
+variables and nothing else. The autopilot distance is fixed at `0` by the transform, so
+the only tunable value is the stargate clearance.
 
 | Key | Default | Range / values | Effect |
 |---|---|---|---|
 | `EVEJS_AUTOPILOT_JUMP_ZERO` | `1` | boolean-ish (`1/true/yes/on/enabled`, `0/false/no/off/disabled`) | `0` = mod inert, vanilla behaviour |
-| `EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS` | `0` | finite number, `0` .. `1000000` | autopilot warp-in distance |
+| `EVEJS_AUTOPILOT_JUMP_ZERO_SURFACE_CLEARANCE_METERS` | `500` | finite number, `0` .. `2000` | stargate surface clearance, capped at the ship's own radius |
 | `EVEJS_AUTOPILOT_JUMP_ZERO_VERBOSE` | `0` | boolean-ish | extra hook-detail logging |
 
-The distance is the whole tuning surface:
+The clearance only shapes a stargate landing, and only for hulls big enough to use it:
 
 | Value | Behaviour |
 |---|---|
-| `0` | land on the target - gates jump on arrival, stations dock on arrival (**intended**) |
-| `1` .. `2500` | gate landings still inside the client's ~2.5 km jump bubble |
-| above `2500` | landings pushed back outside the bubble - the retail-style approach and crawl return (retail sits around `15000`) |
+| `0` | the hull's radius alone - the centre never enters the gate, but the hull exactly touches its surface |
+| `500` (default) | up to 500 m of gap on top of the hull's radius; a frigate gains 31 m, a battleship 250 m, a carrier or titan 500 m |
+| above `500` | safer still, but more landings fall outside the client's jump bubble and cost a short approach |
+
+The clearance is capped at the ship's own radius, so the smallest hulls keep the landing
+they had before this setting existed. It cannot be expressed through the warp range at
+all: vanilla ignores any requested surface range at or below 2500, which is exactly why
+the geometry had to be transformed instead.
 
 An out-of-range or non-numeric value is **rejected at load time**: the mod logs
 the problem and goes inert. It does not clamp, and it does not guess.
 
-**Docker note.** Images built from the EveJS project exclude dotfiles
-(`.dockerignore`: `**/.env`, `**/.env.*`), so a `.env` inside the mod folder never
-reaches a container. Configure Docker deployments with real environment
-variables on the `server` service in `compose.yaml`:
+**Docker note.** Set the variables on the `server` service in `compose.yaml`; there is no
+file to ship, and an old `.env` beside `loader.js` would not reach a container anyway
+(the project's `.dockerignore` excludes `**/.env`):
 
 ```yaml
     environment:
-      EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS: "0"
+      EVEJS_AUTOPILOT_JUMP_ZERO_SURFACE_CLEARANCE_METERS: "500"
 ```
 
 ---
@@ -398,11 +465,14 @@ flowchart LR
   E -->|"still too far"| H["Approach leg at sub-warp speed<br/>(the slow part)"]
 ```
 
-`X` = `10000` in vanilla 0.12.9, `0` with this mod. The mod only moves `X`; every
-arrow to its right is the game's own behaviour and is left alone.
+`X` = `10000` in vanilla 261018.1, `0` with this mod. The mod only moves `X`; every
+arrow to its right is the game's own behaviour and is left alone. When the target is a
+stargate, the exit point itself is produced by `getStargateWarpExitEnvelopePoint`, which is
+where the second seam adds the ship's radius and the clearance (section 2.1.1).
 
 In one sentence: *the client asks for a warp without a range, the server picks
-the range, and this mod makes the server pick zero.*
+the range, and this mod makes the server pick zero - and makes the stargate landing
+point account for how big the ship is.*
 
 ---
 
@@ -416,13 +486,14 @@ path idempotently.
 |---|---|---|---|
 | Docker, separate server service (Docker Compose project) | `docker/entrypoint.sh`, `run_server()` | `--require /app/mods/autopilotJumpZero/loader.js` | yes - `mods/` is baked into the image |
 | Docker, single-container "all" mode (the image's default `CMD ["all"]`) | `docker/entrypoint.sh`, `run_all()` | same | yes |
+| Docker build context | `.dockerignore` | `!mods/` and `!mods/**` (261018.1 starts from `**` and does not list `mods/`; without them `COPY . .` never brings the payload into the image, and the preload above then dies with `Cannot find module`) | yes |
 | Native Windows | `StartServer.bat`, once the installer adds the block (this checkout's launcher has none) | `NODE_OPTIONS=<existing> --require "<root>/mods/autopilotJumpZero/loader.js"` (appended) | no |
 | EveJS Launcher (third-party) | `Mods > Add ZIP` in the launcher, then its mod list | enable the entry `evejs-launcher.mod.json` declares (`kind: "loader"`, `activation.strategy: "loader_rename"`) | Docker yes, native no |
 
 That last row is a **manifest** registration rather than a file the installer edits.
 `evejs-launcher.mod.json` declares `schemaVersion: 3`, `"kind": "loader"`,
 `"activation": { "strategy": "loader_rename" }`, `supportedBackends: ["native", "docker"]`,
-`compatibility.evejsVersions: ["0.12.9"]` and `restart: "game_server"`; the launcher enables
+`compatibility.evejsVersions: ["261018.1"]` and `restart: "game_server"`; the launcher enables
 the entry by renaming the loader payload rather than by patching anything, which is all this
 mod needs because it is server-side only - there is no client component, no login handshake
 and no vendor file to patch. The manifest declares no `settings` block, so the launcher's
@@ -471,34 +542,43 @@ checkout alone. `--keep-files` unregisters without deleting the folder.
 ## 9. What is verified
 
 `RunTests.bat` (or `node test/run.js`) runs the mechanical suite. The development
-checkout has 28 checks, all passing on Node 24, grouped as:
+checkout has 36 checks, all passing on Node 24, grouped as:
 
 | Group | Covers |
 |---|---|
-| config (4) | defaults, environment overrides, rejection of non-numeric / out-of-range values, disabling |
-| manifest + env (2) | `.env.example` only lists known keys; `evejs-launcher.mod.json` version matches the loader |
-| transform (6) | the vanilla seam is rewritten in place; the transform is idempotent; fail-closed on a missing anchor, on a duplicated seam, and on a seam owned by another patch; unrelated files are left alone |
+| config (6) | defaults, environment overrides, rejection of a non-numeric / out-of-range clearance, disabling, the hull-offset arithmetic, and that no configuration file ships or is read |
+| manifest (1) | `evejs-launcher.mod.json` version and `compatibility` match the loader |
+| transform (10) | both seams rewritten in place; both idempotent; fail-closed on a missing anchor, on a duplicated seam and on a seam owned by another patch (for the autopilot seam *and* the stargate envelope); unrelated files are left alone; the envelope's arithmetic against a live-shaped file |
 | viability (1) | a tree without the autopilot handler is rejected |
 | loader guards (1) | the loader stays inert in worker threads |
-| child process (2) | the installed hook actually drives the handler at `0 m` and at `15000 m` - i.e. the value really reaches `warpToEntity`, end to end |
-| live tree (1) | a real EveJS checkout still reports a recognised seam state |
-| installer (11) | Docker preload insertion, idempotency and removal; refusal when no launch path exists; native preload insertion, legacy upgrade, damaged-block refusal and composition with another loader mod; an end-to-end install → reinstall → uninstall round trip that leaves `server/package.json` byte-identical; and live-tree launch probes |
+| child process (2) | the installed hook drives the handler to `0 m` and feeds the hull offset into the envelope - i.e. both behaviours really arrive, end to end |
+| live tree (1) | a real EveJS checkout still reports a recognised seam state for both files |
+| installer (14) | Docker preload insertion, idempotency and removal; `.dockerignore` allowlist insertion, idempotency and the no-allowlist case; refusal when no launch path exists; native preload insertion, legacy upgrade, damaged-block refusal and composition with another loader mod; an end-to-end install → reinstall → uninstall round trip that leaves `server/package.json` byte-identical; and live-tree launch probes |
 
-In game on EveJS 0.12.9, the verification run showed
+In game on 0.12.9 (the earlier release line) the verification run showed
 `CmdWarpToStuffAutopilot` followed by `CmdStargateJump` for the same character,
-with no `CmdFollowBall` or `CmdSetSpeedFraction` in between. The in-game
-acceptance run also completed without issues.
+with no `CmdFollowBall` or `CmdSetSpeedFraction` in between.
+
+On **261018.1** the same arrival behaviour was accepted in game on the live
+server with a **titan** and a **freighter**: both autopilot jumps fire as the
+warp ends and the hull is no longer thrown clear by the stargate's collision
+volume. That is the acceptance this release was waiting for; the mechanical
+suite and the live-file probes above are what guard it in a checkout.
 
 ---
 
 ## 10. What the mod deliberately does not do
 
-- **It does not touch manual warps.** `Warp to`, `Warp to within`, fleet warps,
-  scan-result warps, mission/agent warps, abyssal warps - every other warp call
-  site carries its own explicit range and is not transformed. Only
-  `Handle_CmdWarpToStuffAutopilot` is.
+- **It does not touch the autopilot range of any warp call except `Handle_CmdWarpToStuffAutopilot`.** `Warp to`,
+  `Warp to within`, fleet warps, scan-result warps, mission/agent warps, abyssal
+  warps - every other warp call site carries its own explicit range and is not
+  transformed.
+- **It does correct the stargate landing geometry for every warp**, manual ones included:
+  without the ship radius the exit point is measured from the gate alone, which is what puts a
+  capital hull inside the gate. This is a fix to a place every warp shares, not a new range for
+  them - a manual "Warp to 10 km" still lands 10 km out, it just no longer buries the hull.
 - **It does not change stargate jump range, aggro, or docking rules.** It only
-  changes where an autopilot warp stops.
+  changes where a warp stops and how far outside the gate that point is.
 - **It does not write to disk.** No vendor file, no lock file, no generated
   source. Uninstall is removal of the registration, not a revert.
 - **It does not ship or require anything on the client side.** There is nothing
@@ -511,9 +591,9 @@ acceptance run also completed without issues.
 ## 11. Tuning, disabling, uninstalling
 
 ```text
-# try the retail-style crawl again (native example)
-mods\autopilotJumpZero\.env ->  EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS=15000
-restart the server
+# give capitals more room at a gate (0-2000; capped at the ship's radius)
+# native: set it in the environment StartServer.bat runs in, then restart
+EVEJS_AUTOPILOT_JUMP_ZERO_SURFACE_CLEARANCE_METERS=1000
 
 # turn the mod off entirely, keeping it installed
 EVEJS_AUTOPILOT_JUMP_ZERO=0
@@ -522,9 +602,9 @@ EVEJS_AUTOPILOT_JUMP_ZERO=0
 installer\uninstall.bat --server "<EveJS root>"   # then rebuild Docker, restart native
 ```
 
-Docker deployments change the same keys as environment variables on the `server`
-service, then `docker compose up -d --no-deps server` - no image rebuild is
-needed to change a *value*, only to add or remove the *mod*.
+Docker deployments set the same variables on the `server` service, then run
+`docker compose up -d --no-deps server` - no image rebuild is needed to change a
+*value*, only to add or remove the *mod*.
 
 ---
 
@@ -532,14 +612,16 @@ needed to change a *value*, only to add or remove the *mod*.
 
 | Log line | Meaning |
 |---|---|
-| `[autopilotJumpZero] v1.1.3 active - autopilot warp-in distance 0 m` | installed and enabled |
-| `[autopilotJumpZero] in-memory transform applied: beyonceService autopilot warp-in distance 0 m` | the seam was actually rewritten in memory |
+| `[autopilotJumpZero] v1.2.0 active - autopilot warp-in distance 0 m, stargate surface clearance up to 500 m` | installed and enabled |
+| `[autopilotJumpZero] in-memory transform applied: beyonceService autopilot warp-in distance 0 m` | the autopilot seam was actually rewritten in memory |
+| `[autopilotJumpZero] in-memory transform applied: stargate landing geometry, up to 500 m surface clearance` | the stargate envelope was actually rewritten in memory |
 | `... in-memory transform already present:` | the file already carried the mod's own seam |
-| `viability gate failed - no hooks installed` (+ reason lines) | the target file is not the shape the mod expects → **server runs vanilla** |
-| `the autopilot warp-in distance is already owned by a server-side patch` | another patch owns the seam → **server runs that patch's behaviour** |
+| `viability gate failed - no hooks installed` (+ reason lines) | a target file is not the shape the mod expects → **server runs vanilla** |
+| `the autopilot warp-in distance is already owned by a server-side patch` | another patch owns the autopilot seam → **server runs that patch's behaviour** |
+| `the stargate landing geometry already accounts for the ship radius` | the server already fixes the hull-size landing → **server runs its own geometry** |
 | `invalid mod-owned configuration - no hooks installed` | a config value failed validation → **server runs vanilla** |
 | `inert - mod disabled; vanilla EveJS autopilot behaviour retained` | `EVEJS_AUTOPILOT_JUMP_ZERO=0` |
-| `required target already cached before hook installation` | load-order problem: the server required `beyonceService` before the preload ran |
+| `required target already cached before hook installation` | load-order problem: the server required a target before the preload ran |
 | `loader failed before activation` | the hook could not be installed; the loader rolled itself back |
 
 In every failure case the server still starts and still runs - it just runs
@@ -553,10 +635,9 @@ for the mod being present.
 ```text
 mods/autopilotJumpZero/
   loader.js                 entry point: gates, Module._load hook, API publication
-  config.js                 env/.env/default resolution + validation
-  lib/sourceTransforms.js   the seam, the anchors, the state machine
-  lib/viability.js          independent shape checks, fail-closed gate
-  .env / .env.example       configuration file (env vars win)
+  config.js                 environment variable resolution + validation (no file)
+  lib/sourceTransforms.js   both seams, the anchors, the state machines
+  lib/viability.js          independent shape checks (both files), fail-closed gate
   evejs-launcher.mod.json   EveJS Launcher manifest (schemaVersion 3, kind loader)
   README.md                 install / configure / verify
   HOW-IT-WORKS.md           this document
@@ -570,7 +651,7 @@ installer/                  development only; pruned from an installed mods/ fol
   uninstall.bat uninstall.js
   status.bat                report what is registered
   lib/deployment.js         root discovery, backup, copy, digests, prune lists
-  lib/register.js           pure text transforms for entrypoint.sh / StartServer.bat
+  lib/register.js           pure text transforms for entrypoint.sh / StartServer.bat / .dockerignore
 ```
 
 ---
@@ -583,7 +664,8 @@ For anyone (human or agent) extending this code:
    on the vendor tree staying pristine; `server/package.json` byte-identity is
    asserted by a test for the same reason.
 2. **Keep transformations token-counted and scoped.** No whole-file regex
-   replaces, no "find the first `minimumRange`" shortcuts.
+   replaces, no "find the first `minimumRange`" shortcuts. Both targets follow the
+   same rule: locate the owning function, count the exact seam, refuse ambiguity.
 3. **Keep the line-count invariant.** A transform that changes a file's line
    count must fail, not proceed.
 4. **Keep failing closed.** New failure modes must log a reason and install
@@ -598,3 +680,8 @@ For anyone (human or agent) extending this code:
 9. **Append to `NODE_OPTIONS`, never claim it.** A launcher block that assigns,
    or that guards with `if not defined`, silently disables whichever loader mod
    registers next to it.
+10. **Keep `mods/` in the Docker build context.** 261018.1's `.dockerignore` starts
+    from `**` and does not mention `mods/`, and the image is built with `COPY . .`;
+    without `!mods/` and `!mods/**` the payload never reaches `/app/mods` and the
+    preload dies with `Cannot find module`. The installer adds them - a manual
+    Docker install must too.

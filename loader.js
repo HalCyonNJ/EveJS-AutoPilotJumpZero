@@ -5,7 +5,7 @@ const Module = require("node:module");
 const path = require("node:path");
 const { isMainThread } = require("node:worker_threads");
 
-const MOD_VERSION = "1.1.3";
+const MOD_VERSION = "1.2.0";
 const MOD_DIR = __dirname;
 const RUNTIME_ROOT = path.resolve(MOD_DIR, "../..");
 const LOG_PREFIX = "[autopilotJumpZero]";
@@ -92,9 +92,27 @@ function createCanonicalCache(canonicalizeFn, options = {}) {
 }
 
 function createApi(config) {
+  // The stargate envelope transform calls this with the ship entity. It returns
+  // the distance to add beyond the gate's own radius: the hull's radius (so the
+  // centre is never inside the gate) plus a clearance capped at that radius, so
+  // a frigate keeps its old landing and only big hulls gain the offset.
+  function stargateSurfaceOffset(entity) {
+    const shipRadius = Number(entity && entity.radius);
+    if (!Number.isFinite(shipRadius) || shipRadius <= 0) return 0;
+    const configured = Number(
+      config && config.surfaceClearanceMeters != null
+        ? config.surfaceClearanceMeters
+        : 0,
+    );
+    const clearance = Number.isFinite(configured)
+      ? Math.min(Math.max(0, configured), shipRadius)
+      : 0;
+    return shipRadius + clearance;
+  }
   return Object.freeze({
     version: MOD_VERSION,
-    warpInDistanceMeters: config.warpInDistanceMeters,
+    surfaceClearanceMeters: config.surfaceClearanceMeters,
+    stargateSurfaceOffset,
     config,
   });
 }
@@ -143,7 +161,9 @@ function installModuleHook(api, runtimeRoot, verbose, options = {}) {
       loadedTargets.set(canonical, loaded.exports);
       log(
         `in-memory transform ${loaded.alreadyInstalled ? "already present" : "applied"}: ` +
-          `${target.key} autopilot warp-in distance ${api.warpInDistanceMeters} m`,
+          (target.key === "warpTargets"
+            ? `stargate landing geometry, up to ${api.surfaceClearanceMeters} m surface clearance`
+            : `${target.key} autopilot landing distance 0 m`),
       );
       if (verbose) log(`owned target resolved: ${target.filename}`);
       return loaded.exports;
@@ -162,7 +182,7 @@ function install(options = {}) {
 
   const runtimeRoot = path.resolve(options.runtimeRoot || RUNTIME_ROOT);
   const environment = options.environment || process.env;
-  const config = require("./config").load(MOD_DIR, environment);
+  const config = require("./config").load(environment);
   if (!config.enabled) {
     log("inert — mod disabled; vanilla EveJS autopilot behaviour retained");
     return { active: false, reason: "disabled", config };
@@ -190,7 +210,10 @@ function install(options = {}) {
     globalThis[apiMarker] = api;
     const installState = Object.freeze({ active: true, api, config, viable, runtimeRoot, hookState });
     globalThis[INSTALL_FLAG] = installState;
-    log(`v${MOD_VERSION} active — autopilot warp-in distance ${config.warpInDistanceMeters} m`);
+    log(
+      `v${MOD_VERSION} active — autopilot lands on the target, ` +
+        `stargate surface clearance up to ${config.surfaceClearanceMeters} m`,
+    );
     return installState;
   } catch (error) {
     if (hookState && Module._load === hookState.hookedLoad) {

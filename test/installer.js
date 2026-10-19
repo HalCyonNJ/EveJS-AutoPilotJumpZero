@@ -60,6 +60,25 @@ const START_SERVER_FIXTURE = [
   "",
 ].join("\r\n");
 
+// The 261018.1 build-context file: everything excluded, then an allowlist that
+// does not mention mods/.
+const DOCKERIGNORE_FIXTURE = [
+  "# The runtime image only needs these application trees.",
+  "**",
+  "!Dockerfile",
+  "!package.json",
+  "!config/",
+  "!config/**",
+  "!server/",
+  "!server/**",
+  "!docker/",
+  "!docker/**",
+  "",
+  "**/node_modules",
+  "**/node_modules/**",
+  "",
+].join("\n");
+
 function buildFixtureRoot(base) {
   const root = path.join(base, "EveJS");
   const write = (relative, text) => {
@@ -71,12 +90,13 @@ function buildFixtureRoot(base) {
   write("server/src/services/ship/beyonceService.js", "// seam fixture\n");
   write("docker/entrypoint.sh", ENTRYPOINT_FIXTURE);
   write("StartServer.bat", START_SERVER_FIXTURE);
+  write(".dockerignore", DOCKERIGNORE_FIXTURE);
   write(
     "server/package.json",
     `${JSON.stringify(
       {
         name: "eve.js",
-        version: "0.12.9",
+        version: "261018.1",
         scripts: {
           start:
             "node --report-on-fatalerror --report-uncaught-exception " +
@@ -328,6 +348,36 @@ function register(harness) {
     }
   });
 
+  test("installer: .dockerignore gains the mods allowlist in the 261018.1 layout", () => {
+    const result = registerLib.applyDockerignoreAllowlist(DOCKERIGNORE_FIXTURE);
+    assert.ok(result.ok, result.reason);
+    assert.strictEqual(result.changed, true);
+    assert.strictEqual(result.insertions, 4);
+    const lines = result.text.split("\n");
+    assert.ok(lines.includes("!mods/"), "the directory line is required");
+    assert.ok(lines.includes("!mods/**"), "the recursive line is required");
+    assert.ok(
+      lines.indexOf("!mods/**") < lines.indexOf("**/node_modules"),
+      "the allowlist has to precede the node_modules exclusion",
+    );
+  });
+
+  test("installer: .dockerignore patch is idempotent", () => {
+    const once = registerLib.applyDockerignoreAllowlist(DOCKERIGNORE_FIXTURE);
+    const twice = registerLib.applyDockerignoreAllowlist(once.text);
+    assert.strictEqual(twice.changed, false);
+    assert.strictEqual(twice.text, once.text);
+    assert.ok(registerLib.hasDockerignoreAllowlist(twice.text));
+  });
+
+  test("installer: .dockerignore without a `**` allowlist is left alone", () => {
+    const plain = "server/logs\nnode_modules\n";
+    const result = registerLib.applyDockerignoreAllowlist(plain);
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.changed, false);
+    assert.strictEqual(result.text, plain);
+  });
+
   test("installer: end to end install, reinstall, and uninstall", () => {
     const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "autopilotjumpzero-"));
     try {
@@ -335,11 +385,13 @@ function register(harness) {
       const entrypoint = path.join(root, "docker", "entrypoint.sh");
       const startServer = path.join(root, "StartServer.bat");
       const packageJson = path.join(root, "server", "package.json");
+      const dockerignore = path.join(root, ".dockerignore");
       const read = (file) => fs.readFileSync(file, "utf8");
       const before = {
         entrypoint: read(entrypoint),
         startServer: read(startServer),
         packageJson: read(packageJson),
+        dockerignore: read(dockerignore),
       };
       const run = (script, args) => {
         const result = spawnSync(
@@ -351,11 +403,39 @@ function register(harness) {
         return result.stdout;
       };
 
+      // An install upgraded from 1.1.x still carries the configuration file 1.2.0
+      // retired; the installer must prune it rather than leave a dead file behind.
+      fs.mkdirSync(path.join(root, "mods", MOD_ID), { recursive: true });
+      fs.writeFileSync(
+        path.join(root, "mods", MOD_ID, ".env"),
+        "EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS=15000\n",
+        "utf8",
+      );
+      fs.writeFileSync(
+        path.join(root, "mods", MOD_ID, ".env.example"),
+        "EVEJS_AUTOPILOT_JUMP_ZERO=1\n",
+        "utf8",
+      );
+
       const installOutput = run("install.js", []);
       assert.ok(fs.existsSync(path.join(root, "mods", MOD_ID, "loader.js")), "loader.js must land in mods/");
+      assert.strictEqual(
+        fs.existsSync(path.join(root, "mods", MOD_ID, ".env")),
+        false,
+        "the retired .env must be pruned from an existing install",
+      );
+      assert.strictEqual(
+        fs.existsSync(path.join(root, "mods", MOD_ID, ".env.example")),
+        false,
+        "the retired .env.example must be pruned from an existing install",
+      );
       assert.ok(
         !fs.existsSync(path.join(root, "mods", MOD_ID, "installer")),
         "installer scaffolding must not be copied into the runtime mod folder",
+      );
+      assert.ok(
+        !fs.existsSync(path.join(root, "mods", MOD_ID, "ANNOUNCEMENT.md")),
+        "ANNOUNCEMENT.md is the author's release-note buffer and must not be copied into the payload",
       );
       assert.strictEqual(read(entrypoint).split(containerPath).length - 1, 2, "both docker launches must preload");
       assert.ok(registerLib.hasStartServerPreload(read(startServer)), "StartServer.bat must preload the loader");
@@ -367,10 +447,23 @@ function register(harness) {
       assert.match(installOutput, /docker \+ native/u, "both deployments must be detected");
       assert.strictEqual(fs.readdirSync(path.join(root, "_autopilotjumpzero-backup")).length, 1, "one backup per run");
 
-      const afterFirst = { entrypoint: read(entrypoint), startServer: read(startServer) };
+      const afterFirst = {
+        entrypoint: read(entrypoint),
+        startServer: read(startServer),
+        dockerignore: read(dockerignore),
+      };
+      assert.strictEqual(
+        afterFirst.dockerignore,
+        registerLib.applyDockerignoreAllowlist(before.dockerignore).text,
+        ".dockerignore must carry the allowlist exactly once",
+      );
       run("install.js", []);
       assert.deepStrictEqual(
-        { entrypoint: read(entrypoint), startServer: read(startServer) },
+        {
+          entrypoint: read(entrypoint),
+          startServer: read(startServer),
+          dockerignore: read(dockerignore),
+        },
         afterFirst,
         "a reinstall must not stack a second registration",
       );
@@ -387,6 +480,11 @@ function register(harness) {
       assert.strictEqual(read(entrypoint), before.entrypoint, "entrypoint must be restored");
       assert.strictEqual(read(startServer), before.startServer, "StartServer.bat must be restored");
       assert.strictEqual(read(packageJson), before.packageJson, "package.json must never have been touched");
+      assert.strictEqual(
+        read(dockerignore),
+        afterFirst.dockerignore,
+        "the mods allowlist is left in .dockerignore on uninstall: another loader mod may still need it",
+      );
       assert.strictEqual(fs.existsSync(path.join(root, "mods", MOD_ID)), false, "mod folder must be retired");
     } finally {
       fs.rmSync(workdir, { recursive: true, force: true });

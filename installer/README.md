@@ -1,9 +1,11 @@
-# Autopilot Jump Zero v1.1.3 - Installer
+# Autopilot Jump Zero v1.2.0 - Installer
 
 Makes the EveJS autopilot warp to the target itself instead of stopping about
 10 km short, so a stargate jump fires the moment the warp ends and a station
-destination docks on arrival. No client update is required and the mod never
-edits EveJS source on disk - it transforms one file in memory at startup.
+destination docks on arrival. The landing is also sized to the hull, so a
+carrier or a titan no longer lands inside a stargate. No client update is
+required and the mod never edits EveJS source on disk - it transforms two files
+in memory at startup.
 
 This installer lives inside the mod folder, beside `loader.js`. The mod itself
 is the folder above; its [README](../README.md) covers the seam and the
@@ -12,7 +14,7 @@ mechanism.
 
 ## Requirements
 
-- EveJS 0.12.9 (native Windows install, or the Docker Compose project).
+- EveJS 261018.1 (native Windows install, or the Docker Compose project).
 - Node.js 18 or newer on `PATH` to run the installer.
 
 ## Install
@@ -31,17 +33,20 @@ and then registers the preload in every deployment it finds:
 | Deployment | Registered in | Entry added |
 |---|---|---|
 | Docker | `docker/entrypoint.sh` | `--require /app/mods/autopilotJumpZero/loader.js` |
+| Docker build context | `.dockerignore` | `!mods/` and `!mods/**`, because 261018.1's allowlist does not mention `mods/` |
 | Native | `StartServer.bat` | `NODE_OPTIONS=<existing> --require "…\mods\autopilotJumpZero\loader.js"` (appended) |
 
 Both registrations are idempotent, so running the installer twice changes
 nothing the second time. Every file it is about to rewrite is copied to
-`<EveJS root>\_autopilotjumpzero-backup\<timestamp>\` first.
+`<EveJS root>\_autopilotjumpzero-backup\<timestamp>\` first. The `.dockerignore`
+lines stay in place if the mod is uninstalled later - another loader mod may
+still depend on them.
 
 Options:
 
 | Option | Effect |
 |---|---|
-| `--docker-only` | Register in `docker/entrypoint.sh` only. |
+| `--docker-only` | Register in `docker/entrypoint.sh` and patch `.dockerignore` only. |
 | `--native-only` | Register in `StartServer.bat` only. |
 | `--dry-run` | Report what would change without writing anything. |
 | `--force` | Replace an existing `mods\autopilotJumpZero` without archiving it. |
@@ -108,13 +113,21 @@ docker compose build
 docker compose up -d --no-deps server
 ```
 
+The same step also adds `!mods/` and `!mods/**` to `.dockerignore`. EveJS 261018.1
+builds its `.dockerignore` as `**` plus an allowlist that does not mention
+`mods/`, and the image is built with `COPY . .`; without those two lines the
+payload never reaches `/app/mods`, and the preload fails at startup with
+`Cannot find module`. The lines are added once, before the `**/node_modules`
+block, and are left in place if the mod is uninstalled later.
+
 ## Confirm it loaded
 
 The server prints one line per launch:
 
 ```text
-[autopilotJumpZero] v1.1.3 active - autopilot warp-in distance 0 m
+[autopilotJumpZero] v1.2.0 active - autopilot warp-in distance 0 m, stargate surface clearance up to 500 m
 [autopilotJumpZero] in-memory transform applied: beyonceService autopilot warp-in distance 0 m
+[autopilotJumpZero] in-memory transform applied: stargate landing geometry, up to 500 m surface clearance
 ```
 
 Inside the container:
@@ -129,24 +142,23 @@ deliberate - it never guesses - and the reason is printed on the next line.
 
 ## Configuration
 
+There is no configuration file and nothing is seeded. The autopilot distance is fixed at `0`; the only
+value worth touching is the stargate clearance, and it is an environment variable:
+
 | Setting | Default | Meaning |
 |---|---:|---|
 | `EVEJS_AUTOPILOT_JUMP_ZERO` | `1` | `0` disables the mod and restores vanilla behaviour. |
-| `EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS` | `0` | Autopilot warp-in distance, `0` to `1000000`. |
+| `EVEJS_AUTOPILOT_JUMP_ZERO_SURFACE_CLEARANCE_METERS` | `500` | Stargate surface clearance, `0` to `2000`, capped at the ship's radius. |
 | `EVEJS_AUTOPILOT_JUMP_ZERO_VERBOSE` | `0` | Logs extra hook details. |
 
-- Native: edit `mods\autopilotJumpZero\.env`. A real environment variable wins
-  over the file, and the installer never overwrites an existing `.env`.
-- Docker: images built from this project exclude dotfiles, so the mod-local
-  `.env` never reaches the container. Add the same keys to the `environment:`
-  block of the `server` service in `compose.yaml`:
+Docker deployments set it on the `server` service:
 
 ```yaml
     environment:
-      EVEJS_AUTOPILOT_JUMP_ZERO_WARP_IN_METERS: "0"
+      EVEJS_AUTOPILOT_JUMP_ZERO_SURFACE_CLEARANCE_METERS: "500"
 ```
 
-The shipped defaults (enabled, 0 m) need no configuration in either deployment.
+The shipped defaults (enabled, `0` m distance, `500` m clearance) need no configuration in either deployment.
 
 ## Uninstall
 
@@ -154,11 +166,12 @@ The shipped defaults (enabled, 0 m) need no configuration in either deployment.
 uninstall.bat --server "C:\path\to\EveJS"
 ```
 
-This removes exactly the two `--require` entries the installer added - so it
-never undoes a mod that registered itself later - archives the mod folder under
-`_autopilotjumpzero-backup\`, and leaves the rest of the checkout untouched.
-Add `--keep-files` to unregister the preload but keep the folder, or
-`--dry-run` to see what would happen.
+This removes exactly the `--require` entries the installer added - so it never
+undoes a mod that registered itself later - archives the mod folder under
+`_autopilotjumpzero-backup\`, and leaves the rest of the checkout untouched. The
+`!mods/` / `!mods/**` lines in `.dockerignore` are deliberately kept, because
+another loader mod may still need them. Add `--keep-files` to unregister the
+preload but keep the folder, or `--dry-run` to see what would happen.
 
 Then rebuild and restart:
 

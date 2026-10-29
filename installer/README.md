@@ -1,4 +1,4 @@
-# Autopilot Jump Zero v1.2.0 - Installer
+# Autopilot Jump Zero v1.2.1 - Installer
 
 Makes the EveJS autopilot warp to the target itself instead of stopping about
 10 km short, so a stargate jump fires the moment the warp ends and a station
@@ -125,7 +125,7 @@ block, and are left in place if the mod is uninstalled later.
 The server prints one line per launch:
 
 ```text
-[autopilotJumpZero] v1.2.0 active - autopilot warp-in distance 0 m, stargate surface clearance up to 500 m
+[autopilotJumpZero] v1.2.1 active - autopilot warp-in distance 0 m, stargate surface clearance up to 500 m
 [autopilotJumpZero] in-memory transform applied: beyonceService autopilot warp-in distance 0 m
 [autopilotJumpZero] in-memory transform applied: stargate landing geometry, up to 500 m surface clearance
 ```

@@ -231,7 +231,7 @@ test("launcher manifest matches the loader version", () => {
   );
   assert.strictEqual(manifest.version, loaderModule.MOD_VERSION);
   assert.strictEqual(manifest.kind, "loader");
-  assert.deepStrictEqual([...manifest.compatibility.evejsVersions], ["261018.1"]);
+  assert.deepStrictEqual([...manifest.compatibility.evejsVersions], ["261018.1", "261028.1"]);
 });
 
 test("transform rewrites the vanilla seam in place", () => {

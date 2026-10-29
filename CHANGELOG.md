@@ -8,6 +8,16 @@ game client installs anything, and an existing `.env` is never overwritten.
 
 ---
 
+## 1.2.1 - 2026-10-29
+
+**Compatibility only: re-checked against EveJS 261028.1.**
+
+- Both seams (`beyonceService.js` autopilot warp-in and `warpTargets.js` stargate
+  envelope) are still exactly one each in 261028.1; the mod's in-memory `inspect()`
+  reports `vanilla` and both transforms apply cleanly.
+- `compatibility.evejsVersions` now lists `261018.1` and `261028.1`.
+- No behaviour change, no server source edit.
+
 ## 1.2.0 - 2026-10-20
 
 **Capitals no longer land inside a stargate, and the mod targets EveJS 261018.1.**

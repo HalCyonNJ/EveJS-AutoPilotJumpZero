@@ -2,7 +2,7 @@
   "schemaVersion": 3,
   "id": "autopilotJumpZero",
   "displayName": "Autopilot Jump Zero",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Autopilot warps land on the target, so stargate jumps fire the moment the warp ends instead of after an approach leg. The landing is also sized to the hull: the ship's own radius is added to the gate's exit point (plus a clearance capped at that radius), so a carrier or a titan no longer materialises inside the gate's collision volume and gets thrown clear.",
   "kind": "loader",
   "supportedBackends": [
@@ -15,7 +15,8 @@
   "restart": "game_server",
   "compatibility": {
     "evejsVersions": [
-      "261018.1"
+      "261018.1",
+      "261028.1"
     ]
   }
 }

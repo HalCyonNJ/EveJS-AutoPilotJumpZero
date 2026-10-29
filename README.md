@@ -1,6 +1,6 @@
-# Autopilot Jump Zero for EveJS 261018.1
+# Autopilot Jump Zero for EveJS 261028.1
 
-EveJS 261018.1 mod for both supported deployments - native (Windows) and Docker - that makes the in-game autopilot warp to the target itself instead of stopping roughly 10 km short of it, so a stargate jump fires the moment the warp ends and a station destination docks on arrival. The landing is also sized to the hull, so a carrier or a titan no longer materialises inside a stargate's collision volume.
+EveJS 261028.1 and 261018.1 mod for both supported deployments - native (Windows) and Docker - that makes the in-game autopilot warp to the target itself instead of stopping roughly 10 km short of it, so a stargate jump fires the moment the warp ends and a station destination docks on arrival. The landing is also sized to the hull, so a carrier or a titan no longer materialises inside a stargate's collision volume.
 
 It patches EveJS only in memory. No vendor source file is edited on disk, and the game client is not touched at all.
 
@@ -175,7 +175,7 @@ NODE_OPTIONS=<existing> --require <evejs>/mods/autopilotJumpZero/loader.js
 !mods/**
 ```
 
-3. Restart the server. A `[autopilotJumpZero] v1.2.0 active — autopilot warp-in distance 0 m, stargate surface clearance up to 500 m` line confirms it.
+3. Restart the server. A `[autopilotJumpZero] v1.2.1 active — autopilot warp-in distance 0 m, stargate surface clearance up to 500 m` line confirms it.
 
 No client update is required and none is produced.
 

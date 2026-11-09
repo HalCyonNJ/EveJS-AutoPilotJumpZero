@@ -8,6 +8,20 @@ game client installs anything, and an existing `.env` is never overwritten.
 
 ---
 
+## 1.2.2 - 2026-11-09
+
+**Compatibility only: re-checked against EveJS 261108.1.**
+
+- Both seams (the `beyonceService.js` autopilot handler and the
+  `warpTargets.js` stargate envelope) are still exactly one each in 261108.1;
+  the mod's in-memory `inspect()` reports `vanilla` and both transforms apply
+  cleanly against the live tree.
+- `warpTargets.js` is byte-identical to 261028.1. `beyonceService.js` changed
+  upstream (the file lost unrelated code), but the autopilot handler and its
+  `minimumRange: 10000` call are unchanged.
+- `compatibility.evejsVersions` now lists `261018.1`, `261028.1` and `261108.1`.
+- No behaviour change, no server source edit.
+
 ## 1.2.1 - 2026-10-29
 
 **Compatibility only: re-checked against EveJS 261028.1.**

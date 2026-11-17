@@ -175,7 +175,7 @@ NODE_OPTIONS=<existing> --require <evejs>/mods/autopilotJumpZero/loader.js
 !mods/**
 ```
 
-3. Restart the server. A `[autopilotJumpZero] v1.2.3 active — autopilot warp-in distance 0 m, stargate surface clearance up to 500 m` line confirms it.
+3. Restart the server. A `[autopilotJumpZero] v1.2.4 active — autopilot warp-in distance 0 m, stargate surface clearance up to 500 m` line confirms it.
 
 No client update is required and none is produced.
 

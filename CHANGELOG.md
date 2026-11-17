@@ -8,6 +8,17 @@ game client installs anything, and an existing `.env` is never overwritten.
 
 ---
 
+## 1.2.4 - 2026-11-17
+
+**Third-party launcher metadata: the package now offers updates from GitHub.**
+
+- Added the schema-3 `updates` block (`provider: github`,
+  `HalCyonNJ/EveJS-AutoPilotJumpZero`, asset `autopilotJumpZero-{version}.zip`,
+  `tagPrefix: v`, `channel: stable`, no preserved files). The launcher can now
+  show an Update button, read the release notes and install the ZIP after the
+  user confirms; nothing else changes.
+- No behaviour change, no new files in the payload.
+
 ## 1.2.3 - 2026-11-16
 
 **Compatibility only: re-checked against EveJS 261115.2.**
